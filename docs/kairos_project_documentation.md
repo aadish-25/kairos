@@ -31,7 +31,7 @@ Kairos is a full-stack, AI-assisted **domestic travel planner**. It helps users 
 ## 2. Product Scope
 
 ### MVP Features
-- Budget-based and/or days-based trip planning
+- Days-based trip planning (days mandatory), optional budget-based constraint
 - Optional destination input
 - Day-wise itinerary generation
 - Hotel suggestions (redirect-only)
@@ -58,7 +58,7 @@ Kairos is a full-stack, AI-assisted **domestic travel planner**. It helps users 
 2. User either:
    - Provides a destination, OR
    - Asks Kairos to suggest one
-3. User provides budget and/or number of days
+3. User provides number of days (mandatory) and optionally a budget
 4. Kairos generates a draft itinerary
 5. User reviews itinerary
 6. Kairos shows basic transport options (if source is provided)
@@ -73,7 +73,7 @@ Kairos is a full-stack, AI-assisted **domestic travel planner**. It helps users 
 ### Itinerary (Trip-level)
 - destination
 - total_days
-- user_budget (optional)
+- user_budget (optional) — days are mandatory
 - estimated_total_cost
 - budget_status (within_budget / exceeds_budget)
 - hotel_strategy (single_stay / split_stay)
@@ -122,7 +122,7 @@ Kairos is a full-stack, AI-assisted **domestic travel planner**. It helps users 
 
 ## 5. Itinerary Generation Pipeline
 
-1. Collect and normalize user constraints
+1. Collect and normalize user constraints (days mandatory, budget optional)
 2. Resolve destination (user-provided or AI-suggested)
 3. Fetch destination context (static or cached)
 4. Decide itinerary shape (days, single vs split stay)
@@ -247,3 +247,4 @@ Rules:
 - Better caching strategies
 - Observability
 - Performance tuning
+
