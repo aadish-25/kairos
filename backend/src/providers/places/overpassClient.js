@@ -32,7 +32,7 @@ async function fetchPlacesForBoundingBox({
   limit = 10,
 }) {
   const query = `
-[out:json][timeout:25];
+[out:json][timeout:45];
 (
   node["tourism"="attraction"](${south},${west},${north},${east});
   node["tourism"="museum"](${south},${west},${north},${east});
@@ -52,7 +52,7 @@ out tags center ${limit};
     try {
       const response = await axios.post(endpoint, query, {
         headers: { "Content-Type": "text/plain" },
-        timeout: 20000,
+        timeout: 50000,
       });
 
       return response.data.elements || [];
@@ -67,7 +67,7 @@ out tags center ${limit};
 
   throw new Error(
     "All Overpass endpoints failed. Last error: " +
-      (lastError?.message || "unknown"),
+    (lastError?.message || "unknown"),
   );
 }
 
