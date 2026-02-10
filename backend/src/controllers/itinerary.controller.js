@@ -28,6 +28,7 @@ const createPlanningContext = asyncHandler(async (req, res) => {
   let suggestedDestinations = null;
   let destinationContext = null;
   let itineraryShape = null;
+  let dayBuckets = null;
 
   if (planningContext.destination.status === "UNRESOLVED") {
     nextAction = "SUGGEST_DESTINATION"
@@ -49,7 +50,7 @@ const createPlanningContext = asyncHandler(async (req, res) => {
     itineraryShape = decideItineraryShape(planningContext.constraints.days, destinationContext);
 
     // Build day buckets
-    let dayBuckets = buildDayBuckets(itineraryShape);
+    dayBuckets = buildDayBuckets(itineraryShape);
 
   }
 
