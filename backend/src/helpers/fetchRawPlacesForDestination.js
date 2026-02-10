@@ -1,37 +1,33 @@
+import { fetchPlacesForBoundingBox } from "../providers/places/overpassClient.js";
+import { normalizeRawPlaces } from "./normalizeRawPlaces.js";
+import ApiError from "../utils/ApiError.js";
 import axios from "axios";
-import { fetchPlacesForBoundingBox } from "../providers/overpass/overpassClient.js";
 
 async function fetchRawPlacesForDestination(destination) {
-  // 1. Resolve destination → bounding box
   const geoRes = await axios.get(
     "https://nominatim.openstreetmap.org/search",
     {
-      params: {
-        q: destination,
-        format: "json",
-        limit: 1,
-      },
-      headers: {
-        "User-Agent": "kairos/1.0",
-      },
+      params: { q: destination, format: "json", limit: 1 },
+      headers: { "User-Agent": "kairos/1.0" },
     }
   );
 
   if (!geoRes.data.length) {
-    throw new Error("Unable to resolve destination to coordinates");
+    throw new ApiError(400, `Unable to resolve destination: "${destination}"`);
   }
 
-  const place = geoRes.data[0];
-  const [south, north, west, east] = place.boundingbox.map(Number);
+  const [south, north, west, east] =
+    geoRes.data[0].boundingbox.map(Number);
 
-  // 2. Fetch places from Overpass
-  return fetchPlacesForBoundingBox({
+  const rawPlaces = await fetchPlacesForBoundingBox({
     south,
     west,
     north,
     east,
     limit: 50,
   });
+
+  return normalizeRawPlaces(rawPlaces);
 }
 
 export { fetchRawPlacesForDestination };
