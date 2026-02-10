@@ -6,5 +6,5 @@ export async function buildRegionsWithAI(destination, rawPlaces) {
     places: rawPlaces,
   });
 
-  return JSON.parse(res.data);
+  return res.data;
 }
