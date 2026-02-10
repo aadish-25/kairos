@@ -4,12 +4,14 @@ from pydantic import BaseModel, Field, validator
 
 class Place(BaseModel):
     name: str = Field(min_length=1)
+    priority: Literal["main", "optional"]
 
 
 class Region(BaseModel):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     density: Literal["high", "medium", "low"]
+    recommended_days: int = Field(ge=1)
     places: List[Place]
 
     @validator("places")
