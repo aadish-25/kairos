@@ -1,11 +1,12 @@
 import { buildRegionsWithAI } from "../services/aiRegionBuilder.js";
+import { fetchRawPlacesForDestination } from "./fetchRawPlacesForDestination.js";
 import redis from "../config/redis.js";
 
 export async function getDestinationContext(destination) {
   const cached = await redis.get(destination);
   if (cached) return JSON.parse(cached);
 
-  const rawPlaces = await fetchFromOverpass(destination);
+  const rawPlaces = await fetchRawPlacesForDestination(destination);
 
   const structuredContext = await buildRegionsWithAI(
     destination,
