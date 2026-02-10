@@ -2,6 +2,9 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { validateItineraryInput } from "../helpers/inputValidator.js";
 import { buildPlanningContext } from "../helpers/planningContext.js";
+import { decideItineraryShape } from "../helpers/itineraryShaper.js";
+import { getDestinationContext } from "../helpers/destinationContextLoader.js";
+import { buildDayBuckets } from "../helpers/dayBucketBuilder.js";
 
 const createPlanningContext = asyncHandler(async (req, res) => {
   const validatedInput = validateItineraryInput(req.body);
@@ -23,6 +26,9 @@ const createPlanningContext = asyncHandler(async (req, res) => {
   // Decide next step
   let nextAction;
   let suggestedDestinations = null;
+  let destinationContext = null;
+  let itineraryShape = null;
+
   if (planningContext.destination.status === "UNRESOLVED") {
     nextAction = "SUGGEST_DESTINATION"
 
@@ -35,12 +41,31 @@ const createPlanningContext = asyncHandler(async (req, res) => {
     ]
   } else {
     nextAction = "GENERATE_ITINERARY"
+
+    // Get destination context
+    destinationContext = getDestinationContext(planningContext.destination.value)
+
+    // Decide itinerary shape
+    itineraryShape = decideItineraryShape(planningContext.constraints.days, destinationContext);
+
+    // Build day buckets
+    let dayBuckets = buildDayBuckets(itineraryShape);
+
   }
+
+
 
   return res.status(200).json(
     new ApiResponse(
       200,
-      { planningContext, nextAction, suggestedDestinations },
+      {
+        planningContext,
+        suggestedDestinations,
+        itineraryShape,
+        destinationContext,
+        nextAction,
+        dayBuckets
+      },
       "Planning context created successfully"
     )
   );
