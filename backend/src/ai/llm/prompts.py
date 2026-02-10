@@ -14,9 +14,11 @@ RULES:
   - high: many walkable places
   - medium: spread but manageable
   - low: far apart or nature-based
+- recommended_days: estimate how many days a traveller needs for each region (minimum 1).
+- priority: mark the top attractions as "main" and the rest as "optional".
 
 OUTPUT:
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON with this EXACT structure (no extra fields, no missing fields):
 
 {
   "name": "<destination>",
@@ -25,16 +27,20 @@ Return ONLY valid JSON with this structure:
       "id": "<snake_case>",
       "name": "<Human name>",
       "density": "high|medium|low",
-      "places": [ { "name": "<place>" } ]
+      "recommended_days": <integer, >= 1>,
+      "places": [
+        { "name": "<place>", "priority": "main|optional" }
+      ]
     }
   ],
   "travel_profile": {
     "spread": "compact|wide",
     "needs_split_stay": true|false,
-    "min_days": number,
-    "ideal_days": number
+    "min_days": <integer>,
+    "ideal_days": <integer>
   }
 }
 
 NO explanations. JSON ONLY.
 """
+
