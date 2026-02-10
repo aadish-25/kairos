@@ -1,5 +1,12 @@
-import destinations from "../data/destinations.json" assert { type: "json" };
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import ApiError from "../utils/ApiError.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const destinationsPath = join(__dirname, "../data/destinations.json");
+const destinations = JSON.parse(readFileSync(destinationsPath, "utf-8"));
 
 function getDestinationContext(destinationName) {
     if (!destinationName || typeof destinationName !== "string") {
