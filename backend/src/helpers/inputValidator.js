@@ -43,3 +43,11 @@ function validateItineraryInput(input) {
 }
 
 export { validateItineraryInput };
+
+// Sample output:
+// {
+//   days: 3,
+//   budget: 5000,
+//   source: "Chennai",
+//   destination: "Goa"
+// }

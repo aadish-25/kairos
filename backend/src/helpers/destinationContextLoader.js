@@ -13,3 +13,31 @@ function getDestinationContext(destinationName) {
 }
 
 export { getDestinationContext }
+
+// Sample output (getDestinationContext("goa")):
+// {
+//   name: "Goa",
+//   type: "state",
+//   regions: [
+//     {
+//       id: "north_goa",
+//       name: "North Goa",
+//       character: ["beaches", "nightlife"],
+//       density: "high",
+//       recommended_days: 2,
+//       places: [
+//         { name: "Baga Beach", type: "attraction", short_description: "...", tags: [...], priority: "main" },
+//         { name: "Anjuna Flea Market", type: "experience", ... },
+//         ...
+//       ]
+//     },
+//     { id: "central_goa", name: "Central Goa", ... },
+//     { id: "south_goa", name: "South Goa", ... }
+//   ],
+//   travel_profile: {
+//     spread: "wide",
+//     needs_split_stay: true,
+//     min_days: 2,
+//     ideal_days: 4
+//   }
+// }

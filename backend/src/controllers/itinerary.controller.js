@@ -5,6 +5,7 @@ import { buildPlanningContext } from "../helpers/planningContext.js";
 import { decideItineraryShape } from "../helpers/itineraryShaper.js";
 import { getDestinationContext } from "../helpers/destinationContextLoader.js";
 import { buildDayBuckets } from "../helpers/dayBucketBuilder.js";
+import { allocatePlacesToDayBuckets } from "../helpers/placeAllocator.js";
 
 const createPlanningContext = asyncHandler(async (req, res) => {
   const validatedInput = validateItineraryInput(req.body);
@@ -29,6 +30,7 @@ const createPlanningContext = asyncHandler(async (req, res) => {
   let destinationContext = null;
   let itineraryShape = null;
   let dayBuckets = null;
+  let dayPlans = null;
 
   if (planningContext.destination.status === "UNRESOLVED") {
     nextAction = "SUGGEST_DESTINATION"
@@ -52,6 +54,8 @@ const createPlanningContext = asyncHandler(async (req, res) => {
     // Build day buckets
     dayBuckets = buildDayBuckets(itineraryShape);
 
+    // Allocate places to day buckets
+    dayPlans = allocatePlacesToDayBuckets(dayBuckets, destinationContext);
   }
 
 
@@ -65,7 +69,8 @@ const createPlanningContext = asyncHandler(async (req, res) => {
         itineraryShape,
         destinationContext,
         nextAction,
-        dayBuckets
+        dayBuckets,
+        dayPlans
       },
       "Planning context created successfully"
     )
