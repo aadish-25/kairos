@@ -1,0 +1,269 @@
+{
+  "goa": {
+    "name": "Goa",
+    "type": "state",
+    "regions": [
+      {
+        "id": "north_goa",
+        "name": "North Goa",
+        "character": ["beaches", "nightlife"],
+        "density": "high",
+        "recommended_days": 2,
+        "places": [
+          {
+            "name": "Baga Beach",
+            "type": "attraction",
+            "short_description": "Popular beach known for water sports and vibrant shacks",
+            "best_time_note": "Morning or late afternoon to avoid peak heat",
+            "tags": ["beach", "water_sports", "nightlife"],
+            "priority": "main"
+          },
+          {
+            "name": "Anjuna Flea Market",
+            "type": "experience",
+            "short_description": "Iconic Wednesday market with clothes, jewelry, and local crafts",
+            "best_time_note": "Wednesdays only, best visited before noon",
+            "tags": ["shopping", "culture", "local"],
+            "priority": "main"
+          },
+          {
+            "name": "Fort Aguada",
+            "type": "attraction",
+            "short_description": "17th-century Portuguese fort with panoramic sea views",
+            "best_time_note": "Early morning for fewer crowds",
+            "tags": ["history", "viewpoint", "photography"],
+            "priority": "main"
+          },
+          {
+            "name": "Thalassa",
+            "type": "food",
+            "short_description": "Greek restaurant with stunning sunset views over Vagator",
+            "tags": ["restaurant", "sunset", "greek"],
+            "priority": "optional"
+          },
+          {
+            "name": "Chapora Fort",
+            "type": "attraction",
+            "short_description": "Hilltop fort famous for its Dil Chahta Hai view",
+            "tags": ["history", "viewpoint"],
+            "priority": "optional"
+          }
+        ]
+      },
+      {
+        "id": "central_goa",
+        "name": "Central Goa",
+        "character": ["markets", "local_food"],
+        "density": "medium",
+        "recommended_days": 1,
+        "places": [
+          {
+            "name": "Panjim Church Square",
+            "type": "attraction",
+            "short_description": "Colonial-era square with pastel Portuguese architecture",
+            "tags": ["heritage", "architecture", "walking"],
+            "priority": "main"
+          },
+          {
+            "name": "Fontainhas Latin Quarter",
+            "type": "experience",
+            "short_description": "Narrow colorful streets of the old Portuguese quarter",
+            "tags": ["heritage", "walking", "photography"],
+            "priority": "main"
+          },
+          {
+            "name": "Cafe Bodega",
+            "type": "food",
+            "short_description": "Charming cafe in a heritage art gallery compound",
+            "tags": ["cafe", "heritage", "quiet"],
+            "priority": "main"
+          },
+          {
+            "name": "Dona Paula Viewpoint",
+            "type": "attraction",
+            "short_description": "Scenic jetty overlooking the Zuari and Mandovi rivers meeting the sea",
+            "tags": ["viewpoint", "photography"],
+            "priority": "optional"
+          }
+        ]
+      },
+      {
+        "id": "south_goa",
+        "name": "South Goa",
+        "character": ["quiet", "nature"],
+        "density": "low",
+        "recommended_days": 2,
+        "places": [
+          {
+            "name": "Palolem Beach",
+            "type": "attraction",
+            "short_description": "Crescent-shaped beach with calm waters, ideal for relaxing",
+            "tags": ["beach", "quiet", "swimming"],
+            "priority": "main"
+          },
+          {
+            "name": "Basilica of Bom Jesus",
+            "type": "attraction",
+            "short_description": "UNESCO World Heritage church housing St. Francis Xavier's remains",
+            "tags": ["heritage", "history", "architecture"],
+            "priority": "main"
+          },
+          {
+            "name": "Dudhsagar Falls",
+            "type": "attraction",
+            "short_description": "Massive four-tiered waterfall on the Goa-Karnataka border",
+            "best_time_note": "Best during or just after monsoon (Jul–Oct)",
+            "tags": ["nature", "waterfall", "adventure"],
+            "priority": "main"
+          },
+          {
+            "name": "Martin's Corner",
+            "type": "food",
+            "short_description": "Legendary Goan restaurant known for its seafood and live music",
+            "tags": ["restaurant", "seafood", "local"],
+            "priority": "optional"
+          },
+          {
+            "name": "Butterfly Beach",
+            "type": "attraction",
+            "short_description": "Secluded beach accessible only by boat, known for spotting butterflies",
+            "tags": ["beach", "nature", "secluded"],
+            "priority": "optional"
+          }
+        ]
+      }
+    ],
+    "travel_profile": {
+      "spread": "wide",
+      "needs_split_stay": true,
+      "min_days": 2,
+      "ideal_days": 4
+    }
+  },
+  "manali": {
+    "name": "Manali",
+    "type": "city",
+    "regions": [
+      {
+        "id": "old_manali",
+        "name": "Old Manali",
+        "character": ["cafes", "backpacker_culture", "temples"],
+        "density": "medium",
+        "recommended_days": 1,
+        "places": [
+          {
+            "name": "Hadimba Temple",
+            "type": "attraction",
+            "short_description": "Ancient wooden temple surrounded by cedar forest, dedicated to goddess Hadimba",
+            "best_time_note": "Early morning to avoid tourist crowds",
+            "tags": ["temple", "heritage", "nature"],
+            "priority": "main"
+          },
+          {
+            "name": "Old Manali Village Walk",
+            "type": "experience",
+            "short_description": "Charming stone houses, narrow lanes, and hippie cafes along the Manalsu stream",
+            "tags": ["walking", "culture", "cafes"],
+            "priority": "main"
+          },
+          {
+            "name": "Lazy Dog Lounge",
+            "type": "food",
+            "short_description": "Popular traveler cafe known for wood-fired pizza and mountain views",
+            "tags": ["cafe", "backpacker", "chill"],
+            "priority": "optional"
+          },
+          {
+            "name": "Manu Temple",
+            "type": "attraction",
+            "short_description": "Small temple dedicated to sage Manu, believed to be the origin of Manali's name",
+            "tags": ["temple", "heritage", "quiet"],
+            "priority": "optional"
+          }
+        ]
+      },
+      {
+        "id": "manali_town",
+        "name": "Mall Road & Town",
+        "character": ["shopping", "local_food", "markets"],
+        "density": "high",
+        "recommended_days": 1,
+        "places": [
+          {
+            "name": "Mall Road",
+            "type": "experience",
+            "short_description": "Main shopping street with local handicrafts, woolens, and street food",
+            "tags": ["shopping", "street_food", "walking"],
+            "priority": "main"
+          },
+          {
+            "name": "Vashisht Hot Springs",
+            "type": "attraction",
+            "short_description": "Natural hot water springs with a temple complex, great for a relaxing soak",
+            "tags": ["nature", "temple", "relaxation"],
+            "priority": "main"
+          },
+          {
+            "name": "Tibetan Monastery",
+            "type": "attraction",
+            "short_description": "Colorful Buddhist monastery with a serene atmosphere and Himalayan views",
+            "tags": ["culture", "monastery", "photography"],
+            "priority": "main"
+          },
+          {
+            "name": "Johnson's Cafe",
+            "type": "food",
+            "short_description": "Iconic Manali restaurant known for trout and European-style dishes",
+            "tags": ["restaurant", "fine_dining", "trout"],
+            "priority": "optional"
+          }
+        ]
+      },
+      {
+        "id": "solang_rohtang",
+        "name": "Solang Valley & Rohtang",
+        "character": ["adventure", "snow", "mountains"],
+        "density": "low",
+        "recommended_days": 1,
+        "places": [
+          {
+            "name": "Solang Valley",
+            "type": "attraction",
+            "short_description": "Adventure hub for paragliding, zorbing, and skiing with stunning valley views",
+            "best_time_note": "Winter for snow activities, summer for paragliding",
+            "tags": ["adventure", "snow", "valley", "paragliding"],
+            "priority": "main"
+          },
+          {
+            "name": "Rohtang Pass",
+            "type": "attraction",
+            "short_description": "High-altitude mountain pass at 3,978m with snow-capped panoramas",
+            "best_time_note": "Open May–November only, requires permit",
+            "tags": ["mountain_pass", "snow", "photography", "adventure"],
+            "priority": "main"
+          },
+          {
+            "name": "Atal Tunnel",
+            "type": "attraction",
+            "short_description": "World's longest highway tunnel above 10,000 ft, connecting Manali to Lahaul Valley",
+            "tags": ["engineering", "tunnel", "scenic_drive"],
+            "priority": "main"
+          },
+          {
+            "name": "Sissu Waterfall",
+            "type": "attraction",
+            "short_description": "Spectacular waterfall visible from the highway beyond Atal Tunnel",
+            "tags": ["waterfall", "nature", "photography"],
+            "priority": "optional"
+          }
+        ]
+      }
+    ],
+    "travel_profile": {
+      "spread": "compact",
+      "needs_split_stay": false,
+      "min_days": 2,
+      "ideal_days": 3
+    }
+  }
+}
