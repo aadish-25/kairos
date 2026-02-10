@@ -1,3 +1,27 @@
 node_modules
 .env
 dist
+
+# Virtual environment
+venv/
+.venv/
+
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+*.sqlite3
+*.log
+
+# IDE-specific files (optional, but recommended)
+.vscode/
+.idea/
+
+# Packaging and distribution
+dist/
+build/
+*.egg-info/
