@@ -1,8 +1,4 @@
 from langchain_groq import ChatGroq
 
 def get_groq_llm():
-    return ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.2,
-        max_tokens=4000
-    )
+    return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2, max_tokens=4000)
