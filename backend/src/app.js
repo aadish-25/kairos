@@ -11,9 +11,11 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
 // Routes import
 import itineraryRouter from "./routes/itinerary.routes.js";
+import healthRouter from "./routes/health.routes.js";
 
 // Routes declaration
 app.use("/api/v1/itinerary", itineraryRouter);
+app.use("/api/v1/health", healthRouter);
 
 // Global Error Middleware
 app.use((err, req, res, next) => {
@@ -21,7 +23,7 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message: err.message || "Internal Server Error",
-    errors: err.errors || []
+    errors: err.errors || [],
   });
 });
 

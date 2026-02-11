@@ -2,20 +2,22 @@ from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 import os
 import traceback
+from llm.region_builder import build_regions
 
 load_dotenv()
 
-from llm.region_builder import build_regions
-
 app = FastAPI()
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 
 @app.post("/build-regions")
 def build(payload: dict):
     try:
-        return build_regions(
-            payload["destination"],
-            payload["places"]
-        )
+        return build_regions(payload["destination"], payload["places"])
     except Exception as e:
         with open("error.log", "w") as f:
             f.write(traceback.format_exc())
