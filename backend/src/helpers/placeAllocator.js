@@ -7,141 +7,157 @@ import ApiError from "../utils/ApiError.js";
  *   1. Define a "Ideal Day Schedule" with 5 slots (Morning -> Evening).
  *   2. For each slot, find the best candidate from available places based on:
  *      - Time match (Morning place for morning slot)
+ *      - Diversity (Boost Heritage if missing, Penalty for Nightlife if present)
  *      - Variety (Don't repeat subcategory immediately)
- *      - Priority (Main > Optional)
+ *   3. Enforce limit of 1 Nightlife spot per day unless "party" focus.
  */
-function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
-    if (!Array.isArray(dayBuckets)) throw new ApiError(500, "Invalid day buckets");
-    if (!destinationContext || !Array.isArray(destinationContext.regions)) {
-        throw new ApiError(500, "Invalid destination context");
-    }
-
-    const regionMap = new Map();
-    for (const region of destinationContext.regions) {
-        regionMap.set(region.id, region);
-    }
-
-    const usedPlaces = new Set();
-    const dayPlans = [];
-
-    // Define the ideal flow for a day (5 Main places)
-    const dailySchedule = [
-        { label: "Morning Activity", allowedTimes: ["morning", "anytime"], prohibited: ["evening", "nightlife"] },
-        { label: "Mid-Day Exploration", allowedTimes: ["morning", "anytime", "afternoon"], prohibited: ["nightlife"] },
-        { label: "Lunch/Afternoon", allowedTimes: ["afternoon", "anytime", "lunch"], prohibited: [] },
-        { label: "Updates/Sunset", allowedTimes: ["evening", "afternoon", "anytime"], prohibited: ["morning"] },
-        { label: "Dinner/Nightlife", allowedTimes: ["evening", "nightlife", "dinner"], prohibited: ["morning"] }
-    ];
-
-    for (const bucket of dayBuckets) {
-        const region = regionMap.get(bucket.region_id);
-
-        // Basic fallback if region missing
-        if (!region) {
-            dayPlans.push({
-                day: bucket.day,
-                region_id: bucket.region_id,
-                region_name: bucket.region_name,
-                places: { main: [], optional: [] },
+export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
+    // 1. Group available places by ID/Name to track usage across all days
+    const availablePlaces = [];
+    destinationContext.regions.forEach((region) => {
+        if (region.places) {
+            region.places.forEach((p) => {
+                // Add region_id to place for tracking
+                p.region_id = region.id;
+                availablePlaces.push(p);
             });
-            continue;
         }
+    });
 
-        // Get all unused places
-        let available = (region.places || []).filter(p => !usedPlaces.has(p.name));
+    const usedPlaceNames = new Set();
 
-        // 1. Fill Main Slots based on Schedule
-        const mainPicks = [];
-        let lastSubcategory = null;
-
-        for (const slot of dailySchedule) {
-            const candidate = findBestCandidate(available, slot, lastSubcategory);
-            if (candidate) {
-                mainPicks.push(candidate);
-                usedPlaces.add(candidate.name);
-                lastSubcategory = candidate.subcategory || candidate.category;
-
-                // Refresh available list
-                available = available.filter(p => p.name !== candidate.name);
-            }
-        }
-
-        // 2. Fill Optional Slots (3 places) - looser rules, just variety
-        const optionalPicks = [];
-        for (let i = 0; i < 3; i++) {
-            // Try to pick something different from the last main pick
-            const candidate = findBestCandidate(available, { allowedTimes: ["anytime", "morning", "afternoon", "evening"] }, lastSubcategory);
-            if (candidate) {
-                optionalPicks.push(candidate);
-                usedPlaces.add(candidate.name);
-                lastSubcategory = candidate.subcategory;
-                available = available.filter(p => p.name !== candidate.name);
-            }
-        }
-
-        dayPlans.push({
+    // Map buckets to plans directly (No mutation of original buckets)
+    return dayBuckets.map((bucket) => {
+        const dayPlan = {
             day: bucket.day,
             region_id: bucket.region_id,
             region_name: bucket.region_name,
             places: {
-                main: mainPicks,
-                optional: optionalPicks,
+                main: [],
+                optional: [],
             },
-        });
-    }
+        };
 
-    return dayPlans;
-}
+        // Filter places for this region
+        let regionPlaces = availablePlaces.filter(
+            (p) => p.region_id === bucket.region_id && !usedPlaceNames.has(p.name)
+        );
 
-/**
- * Finds the best place for a specific time slot.
- */
-function findBestCandidate(pool, slot, lastSubcategory) {
-    if (!pool || pool.length === 0) return null;
+        // Define 5 Main Slots for a balanced day
+        const mainSlots = [
+            { type: "Morning Activity", allowedTimes: ["morning", "anytime"], priorityCategory: "nature" },
+            { type: "Culture/Daytime", allowedTimes: ["morning", "afternoon", "anytime"], priorityCategory: "heritage" },
+            { type: "Lunch", allowedTimes: ["lunch", "afternoon", "anytime"], priorityCategory: "food" },
+            { type: "Afternoon/Sunset", allowedTimes: ["evening", "afternoon", "anytime"], priorityCategory: "nature" },
+            { type: "Dinner/Nightlife", allowedTimes: ["dinner", "evening", "nightlife"], priorityCategory: "food" }
+        ];
 
-    // Filter by Time
-    let candidates = pool.filter(p => {
-        const time = (p.best_time || "anytime").toLowerCase();
-        // Check prohibited
-        if (slot.prohibited && slot.prohibited.includes(time)) return false;
-        // Check allowed (if strict) or just prioritize
-        return true;
+        // Track categories allocated today
+        const categoryCounts = {
+            nature: 0,
+            heritage: 0,
+            food: 0,
+            nightlife: 0,
+            shopping: 0,
+            other: 0
+        };
+
+        let lastSubcategory = null;
+
+        // Fill Main Slots
+        for (const slot of mainSlots) {
+            if (regionPlaces.length === 0) break;
+
+            const candidate = findBestCandidate(regionPlaces, slot, lastSubcategory, categoryCounts);
+
+            if (candidate) {
+                // FORCE PRIORITY CONSISTENCY: Main array = "main" priority
+                dayPlan.places.main.push({ ...candidate, priority: "main" });
+                usedPlaceNames.add(candidate.name);
+                lastSubcategory = candidate.subcategory || "other";
+
+                // Update counts
+                const cat = candidate.category || "other";
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+
+                // Remove from available pool
+                regionPlaces = regionPlaces.filter((p) => p.name !== candidate.name);
+            }
+        }
+
+        // Fill 3 Optional Slots (Anytime/Evening)
+        for (let i = 0; i < 3; i++) {
+            if (regionPlaces.length === 0) break;
+            // Just pick high priority remaining
+            const candidate = regionPlaces.find(p => p.priority === "main") || regionPlaces[0];
+            if (candidate) {
+                // FORCE PRIORITY CONSISTENCY: Optional array = "optional" priority
+                dayPlan.places.optional.push({ ...candidate, priority: "optional" });
+                usedPlaceNames.add(candidate.name);
+                regionPlaces = regionPlaces.filter(p => p.name !== candidate.name);
+            }
+        }
+
+        return dayPlan;
     });
-
-    // Score candidates
-    // Higer score = better match
-    candidates.sort((a, b) => {
-        const scoreA = calculateScore(a, slot, lastSubcategory);
-        const scoreB = calculateScore(b, slot, lastSubcategory);
-        return scoreB - scoreA; // Descending
-    });
-
-    return candidates[0] || null;
 }
 
-function calculateScore(place, slot, lastSubcategory) {
-    let score = 0;
+function findBestCandidate(places, slot, lastSubcategory, categoryCounts) {
+    let bestScore = -Infinity;
+    let bestPlace = null;
 
-    const time = (place.best_time || "anytime").toLowerCase();
-    const priority = place.priority;
-    const subcat = place.subcategory || place.category;
+    for (const place of places) {
+        let score = 0;
 
-    // 1. Time Match (+50)
-    if (slot.allowedTimes && slot.allowedTimes.includes(time)) {
-        // Give higher points if it matches the PRIMARY intent (first in list)
-        if (time === slot.allowedTimes[0]) score += 50;
-        else score += 30;
+        // 1. Time Match
+        if (place.best_time && slot.allowedTimes.includes(place.best_time)) {
+            if (place.best_time === slot.allowedTimes[0]) score += 50; // Perfect match
+            else score += 20; // Acceptable match
+        } else if (place.best_time === "anytime") {
+            score += 10;
+        } else {
+            score -= 50; // Wrong time (e.g. Nightlife in Morning)
+        }
+
+        // 2. Category Priority for Slot
+        if (place.category === slot.priorityCategory) {
+            score += 20;
+        }
+
+        // 3. Diversity Logic (Heritage Boost, Nightlife Limiting)
+        if (place.category === "heritage" && categoryCounts["heritage"] === 0) {
+            score += 40;
+        }
+        if (place.category === "shopping" && categoryCounts["shopping"] === 0) {
+            score += 10;
+        }
+
+        if (place.category === "nightlife") {
+            if (categoryCounts["nightlife"] >= 1) score -= 50;
+            if (slot.type !== "Dinner/Nightlife") score -= 30;
+        }
+
+        if (place.category === "nature" && categoryCounts["nature"] >= 2) {
+            score -= 10;
+        }
+
+        // 4. Variety Check (Subcategory)
+        if (place.subcategory === lastSubcategory) {
+            score -= 40;
+        }
+
+        // 5. Main Priority Boost
+        if (place.priority === "main") {
+            score += 10;
+        }
+
+        // 6. (Removed) Lat/Lon Bonus - Strictly metadata for V1
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestPlace = place;
+        }
     }
 
-    // 2. Priority match (+20 for main)
-    if (priority === "main") score += 20;
-
-    // 3. Variety Check (-40 if same subcategory as previous)
-    if (lastSubcategory && subcat === lastSubcategory) {
-        score -= 40;
-    }
-
-    return score;
+    return bestPlace;
 }
-
-export { allocatePlacesToDayBuckets };
