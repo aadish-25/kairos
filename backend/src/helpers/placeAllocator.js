@@ -11,6 +11,7 @@ import ApiError from "../utils/ApiError.js";
  *      - Variety (Don't repeat subcategory immediately)
  *   3. Enforce limit of 1 Nightlife spot per day unless "party" focus.
  */
+
 export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
     // 1. Group available places by ID/Name to track usage across all days
     const availablePlaces = [];
@@ -63,14 +64,19 @@ export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
         };
 
         let lastSubcategory = null;
+        let anchorCoords = null;
 
         // Fill Main Slots
         for (const slot of mainSlots) {
             if (regionPlaces.length === 0) break;
 
-            const candidate = findBestCandidate(regionPlaces, slot, lastSubcategory, categoryCounts);
+            const candidate = findBestCandidate(regionPlaces, slot, lastSubcategory, categoryCounts, anchorCoords);
 
             if (candidate) {
+                // If it is day 1, set anchor coordinates
+                if (!anchorCoords && candidate.lat && candidate.lon) {
+                    anchorCoords = { lat: candidate.lat, lon: candidate.lon };
+                }
                 // FORCE PRIORITY CONSISTENCY: Main array = "main" priority
                 dayPlan.places.main.push({ ...candidate, priority: "main" });
                 usedPlaceNames.add(candidate.name);
@@ -102,12 +108,23 @@ export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
     });
 }
 
-function findBestCandidate(places, slot, lastSubcategory, categoryCounts) {
+function findBestCandidate(places, slot, lastSubcategory, categoryCounts, anchorCoords) {
     let bestScore = -Infinity;
     let bestPlace = null;
 
     for (const place of places) {
         let score = 0;
+
+        // Proximity Bonus (V1 Clustering)
+        if (anchorCoords && place.lat && place.lon) {
+            const dist = getDistance(anchorCoords.lat, anchorCoords.lon, place.lat, place.lon);
+
+            if (dist !== null) {
+                if (dist < 5) score += 100;      // Very close! (High priority)
+                else if (dist < 10) score += 40;  // Reasonable distance
+                else if (dist > 15) score -= 30;  // Too far (Penalty)
+            }
+        }
 
         // 1. Time Match
         if (place.best_time && slot.allowedTimes.includes(place.best_time)) {
@@ -160,4 +177,24 @@ function findBestCandidate(places, slot, lastSubcategory, categoryCounts) {
     }
 
     return bestPlace;
+}
+
+/**
+ * Calculates distance between two coordinates in Kilometers.
+ * Using Haversine Formula
+ */
+function getDistance(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
