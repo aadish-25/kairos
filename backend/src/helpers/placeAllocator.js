@@ -4,17 +4,14 @@ import ApiError from "../utils/ApiError.js";
  * Smart place allocator that builds natural day flows.
  *
  * Strategy:
- *   1. Group available places by best_time
- *   2. Fill each day with a natural flow: Morning → Daytime → Lunch → Afternoon → Dinner
- *   3. Enforce variety: avoid consecutive picks from the SAME SUBCATEGORY.
- *      (e.g., Beach -> Fort is fine. Beach -> Beach is not ideal unless we run out).
- *   4. Target ~5 main + ~3 optional per day.
+ *   1. Define a "Ideal Day Schedule" with 5 slots (Morning -> Evening).
+ *   2. For each slot, find the best candidate from available places based on:
+ *      - Time match (Morning place for morning slot)
+ *      - Variety (Don't repeat subcategory immediately)
+ *      - Priority (Main > Optional)
  */
 function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
-    if (!Array.isArray(dayBuckets)) {
-        throw new ApiError(500, "Invalid day buckets");
-    }
-
+    if (!Array.isArray(dayBuckets)) throw new ApiError(500, "Invalid day buckets");
     if (!destinationContext || !Array.isArray(destinationContext.regions)) {
         throw new ApiError(500, "Invalid destination context");
     }
@@ -27,8 +24,19 @@ function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
     const usedPlaces = new Set();
     const dayPlans = [];
 
+    // Define the ideal flow for a day (5 Main places)
+    const dailySchedule = [
+        { label: "Morning Activity", allowedTimes: ["morning", "anytime"], prohibited: ["evening", "nightlife"] },
+        { label: "Mid-Day Exploration", allowedTimes: ["morning", "anytime", "afternoon"], prohibited: ["nightlife"] },
+        { label: "Lunch/Afternoon", allowedTimes: ["afternoon", "anytime", "lunch"], prohibited: [] },
+        { label: "Updates/Sunset", allowedTimes: ["evening", "afternoon", "anytime"], prohibited: ["morning"] },
+        { label: "Dinner/Nightlife", allowedTimes: ["evening", "nightlife", "dinner"], prohibited: ["morning"] }
+    ];
+
     for (const bucket of dayBuckets) {
         const region = regionMap.get(bucket.region_id);
+
+        // Basic fallback if region missing
         if (!region) {
             dayPlans.push({
                 day: bucket.day,
@@ -39,26 +47,37 @@ function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
             continue;
         }
 
-        // Get all unused places for this region
-        const available = (region.places || []).filter(
-            (p) => !usedPlaces.has(p.name)
-        );
+        // Get all unused places
+        let available = (region.places || []).filter(p => !usedPlaces.has(p.name));
 
-        // Separate by priority
-        const mainPool = available.filter((p) => p.priority === "main");
-        const optionalPool = available.filter((p) => p.priority === "optional");
+        // 1. Fill Main Slots based on Schedule
+        const mainPicks = [];
+        let lastSubcategory = null;
 
-        // Build the day using smart picking
-        const mainPicks = smartPick(mainPool, 5, usedPlaces);
+        for (const slot of dailySchedule) {
+            const candidate = findBestCandidate(available, slot, lastSubcategory);
+            if (candidate) {
+                mainPicks.push(candidate);
+                usedPlaces.add(candidate.name);
+                lastSubcategory = candidate.subcategory || candidate.category;
 
-        // If we didn't get enough main picks, promote optionals
-        if (mainPicks.length < 3) {
-            const extraNeeded = 3 - mainPicks.length;
-            const promoted = smartPick(optionalPool, extraNeeded, usedPlaces);
-            mainPicks.push(...promoted);
+                // Refresh available list
+                available = available.filter(p => p.name !== candidate.name);
+            }
         }
 
-        const optionalPicks = smartPick(optionalPool, 3, usedPlaces);
+        // 2. Fill Optional Slots (3 places) - looser rules, just variety
+        const optionalPicks = [];
+        for (let i = 0; i < 3; i++) {
+            // Try to pick something different from the last main pick
+            const candidate = findBestCandidate(available, { allowedTimes: ["anytime", "morning", "afternoon", "evening"] }, lastSubcategory);
+            if (candidate) {
+                optionalPicks.push(candidate);
+                usedPlaces.add(candidate.name);
+                lastSubcategory = candidate.subcategory;
+                available = available.filter(p => p.name !== candidate.name);
+            }
+        }
 
         dayPlans.push({
             day: bucket.day,
@@ -75,58 +94,54 @@ function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
 }
 
 /**
- * Smart picking: select places while maximizing SUBCATEGORY variety.
- *
- * Algorithm:
- *   1. Group by subcategory (or category if subcategory is missing)
- *   2. Round-robin through groups
- *   3. Continue until we reach the desired count
+ * Finds the best place for a specific time slot.
  */
-function smartPick(candidates, count, usedPlaces) {
-    if (!candidates.length || count <= 0) return [];
+function findBestCandidate(pool, slot, lastSubcategory) {
+    if (!pool || pool.length === 0) return null;
 
-    // Group by SUBCATEGORY for better variety (Beach vs Waterfall vs Fort)
-    // Fallback to Category if subcategory isn't clear
-    const byGroup = new Map();
-    for (const place of candidates) {
-        if (usedPlaces.has(place.name)) continue;
+    // Filter by Time
+    let candidates = pool.filter(p => {
+        const time = (p.best_time || "anytime").toLowerCase();
+        // Check prohibited
+        if (slot.prohibited && slot.prohibited.includes(time)) return false;
+        // Check allowed (if strict) or just prioritize
+        return true;
+    });
 
-        // Use subcategory if present, else category, else "other"
-        const group = place.subcategory || place.category || "other";
+    // Score candidates
+    // Higer score = better match
+    candidates.sort((a, b) => {
+        const scoreA = calculateScore(a, slot, lastSubcategory);
+        const scoreB = calculateScore(b, slot, lastSubcategory);
+        return scoreB - scoreA; // Descending
+    });
 
-        if (!byGroup.has(group)) byGroup.set(group, []);
-        byGroup.get(group).push(place);
+    return candidates[0] || null;
+}
+
+function calculateScore(place, slot, lastSubcategory) {
+    let score = 0;
+
+    const time = (place.best_time || "anytime").toLowerCase();
+    const priority = place.priority;
+    const subcat = place.subcategory || place.category;
+
+    // 1. Time Match (+50)
+    if (slot.allowedTimes && slot.allowedTimes.includes(time)) {
+        // Give higher points if it matches the PRIMARY intent (first in list)
+        if (time === slot.allowedTimes[0]) score += 50;
+        else score += 30;
     }
 
-    const picks = [];
-    const groupKeys = [...byGroup.keys()];
-    let groupIndex = 0;
+    // 2. Priority match (+20 for main)
+    if (priority === "main") score += 20;
 
-    // Round-robin through groups
-    while (picks.length < count && groupKeys.length > 0) {
-        const group = groupKeys[groupIndex % groupKeys.length];
-        const pool = byGroup.get(group);
-
-        if (pool && pool.length > 0) {
-            const place = pool.shift();
-            if (!usedPlaces.has(place.name)) {
-                picks.push(place);
-                usedPlaces.add(place.name);
-            }
-        }
-
-        // Remove exhausted groups
-        if (!pool || pool.length === 0) {
-            const idx = groupKeys.indexOf(group);
-            if (idx !== -1) groupKeys.splice(idx, 1);
-            if (groupKeys.length === 0) break;
-            // Don't increment index since array shifted
-        } else {
-            groupIndex++;
-        }
+    // 3. Variety Check (-40 if same subcategory as previous)
+    if (lastSubcategory && subcat === lastSubcategory) {
+        score -= 40;
     }
 
-    return picks;
+    return score;
 }
 
 export { allocatePlacesToDayBuckets };
