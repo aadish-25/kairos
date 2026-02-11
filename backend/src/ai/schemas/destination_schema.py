@@ -1,17 +1,21 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, validator
 
 
 class Place(BaseModel):
     name: str = Field(min_length=1)
     priority: Literal["main", "optional"]
+    category: str = "other"       # High-level: nature, food, heritage, etc.
+    subcategory: str = "other"    # Specific: beach, temple, cafe, fort, market
+    specialty: List[str] = []     # Unique traits: sunset, seafood, live music. Empty if generic.
+    best_time: str = "anytime"
 
 
 class Region(BaseModel):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     density: Literal["high", "medium", "low"]
-    recommended_days: int = Field(ge=1)
+    recommended_days: int = Field(ge=0, default=1)
     places: List[Place]
 
     @validator("places")
