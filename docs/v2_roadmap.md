@@ -4,25 +4,24 @@ This document outlines architectural improvements and feature enhancements plann
 
 These items address known limitations in the current V1 implementation and aim to transform the system from "Functional" to "Intelligent & Scalable".
 
-## 1. Data Enrichment & Hydration (High Priority)
+## 1. Data Enrichment & Hydration (COMPLETED in V1)
 
-**Problem:** The current V1 schema (`Place`) does not store `lat` and `lon` coordinates, leading to data loss during normalization.
-**Impact:** Impossible to render maps, calculate travel times, or do proximity clustering.
+- **Status:** Done (Feb 2026).
+- **Implementation:** `hydratePlaces.js` matches AI output to raw Overpass coordinates.
+- **Result:** 100% hydration rate achieved for Goa.
+
+## 2. Geographic Validation & Clustering (Critical)
+
+**Problem:** V1 places may have inconsistent Lat/Lon data or be assigned to the wrong region (e.g., North Goa vs South Goa boundaries).
 **Solution:**
 
-- Update `destination_schema.py` to include `lat` (float) and `lon` (float).
-- Implement a "Hydration Step" after the LLM returns the itinerary:
-  - Match LLM place names back to the raw Overpass data.
-  - Copy `lat`, `lon`, `website`, `phone`, and other metadata into the final response.
+- **Region Boundary Validation:** Use bounding boxes or centroids to validate that a place belongs to its assigned region.
+- **Geo-Consistency Checks:** Prevent region–coordinate mismatches.
+- **Distance-Aware Planning:**
+  - Once data is validated, use Lat/Lon for **Clustering** (morning/afternoon proximity).
+  - Use Lat/Lon for **Travel Time Estimation**.
 
-## 2. Geographic Awareness & Clustering
-
-**Problem:** Day 1 activities might be scattered across North Goa (e.g., Arambol to Candolim) without regard for travel time.
-**Solution:**
-
-- Implement **Geo-Clustering** for daily buckets.
-- Use `K-Means` or simple bounding box logic to group nearby places together.
-- Ensure morning activities are geographically close to afternoon activities.
+**Constraint:** Until V2 validation is built, Lat/Lon must remain **Metadata Only** and not influence ranking or selection.
 
 ## 3. Advanced Travel Profile Logic
 
