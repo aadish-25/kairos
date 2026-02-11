@@ -28,10 +28,17 @@ function decideItineraryShape(days, destinationContext) {
     for (const region of sortedRegions) {
         if (remainingDays <= 0) break;
 
-        const allocatedDays = Math.min(
+        let allocatedDays = Math.min(
             region.recommended_days,
             remainingDays
         );
+
+        // Ensure we don't give ALL days to one region if others exist
+        // Cap any single region to (totalDays - 1) if there are more regions waiting
+        const regionsLeft = sortedRegions.length - regions_plan.length - 1;
+        if (regionsLeft > 0 && allocatedDays >= remainingDays && remainingDays > 1) {
+            allocatedDays = remainingDays - 1; // Save at least 1 day for next region
+        }
 
         regions_plan.push({
             region_id: region.id,

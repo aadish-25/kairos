@@ -20,7 +20,9 @@ async function fetchRawPlacesForDestination(destination) {
     west,
     north,
     east,
-    limit: 50,
+    anchorLimit: 50,
+    lifestyleLimit: 30,
+    extrasLimit: 20,
   });
 
   return normalizeRawPlaces(rawPlaces);
