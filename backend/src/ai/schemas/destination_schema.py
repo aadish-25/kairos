@@ -9,6 +9,8 @@ class Place(BaseModel):
     subcategory: str = "other"    # Specific: beach, temple, cafe, fort, market
     specialty: List[str] = []     # Unique traits: sunset, seafood, live music. Empty if generic.
     best_time: str = "anytime"
+    lat: Optional[float] = None
+    lon: Optional[float] = None
 
 
 class Region(BaseModel):
