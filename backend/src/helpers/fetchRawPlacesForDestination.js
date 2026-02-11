@@ -1,4 +1,4 @@
-import { fetchPlacesForBoundingBox } from "../providers/places/overpassClient.js";
+import { fetchPlacesForBoundingBox } from "../providers/overpass/overpassClient.js";
 import { normalizeRawPlaces } from "./normalizeRawPlaces.js";
 import ApiError from "../utils/ApiError.js";
 import axios from "axios";
