@@ -1,50 +1,75 @@
 import ApiError from "../utils/ApiError.js";
+import { clusterPlaces, getDistance } from "./geoClustering.js";
 
 /**
  * Smart place allocator that builds natural day flows.
  *
- * Strategy:
- *   1. Define a "Ideal Day Schedule" with 5 slots (Morning -> Evening).
- *   2. For each slot, find the best candidate from available places based on:
- *      - Time match (Morning place for morning slot)
- *      - Diversity (Boost Heritage if missing, Penalty for Nightlife if present)
- *      - Variety (Don't repeat subcategory immediately)
- *   3. Enforce limit of 1 Nightlife spot per day unless "party" focus.
+ * Strategy (Geo-Clustering):
+ *   1. Filter places by Region.
+ *   2. Use K-Means to split region's places into K clusters (where K = number of days for that region).
+ *   3. Assign each day to a specific geographic cluster.
+ *   4. Fill the day using places ONLY from that cluster (with nearest-neighbor fallback).
  */
 
 export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
-    // 1. Group available places by ID/Name to track usage across all days
-    const availablePlaces = [];
+    // 1. Group available places by Region ID to prepare for clustering
+    const regionGroups = {};
     destinationContext.regions.forEach((region) => {
         if (region.places) {
             region.places.forEach((p) => {
-                // Add region_id to place for tracking
-                p.region_id = region.id;
-                availablePlaces.push(p);
+                p.region_id = region.id; // Ensure ID is attached
+                if (!regionGroups[region.id]) regionGroups[region.id] = [];
+                regionGroups[region.id].push(p);
             });
         }
     });
 
     const usedPlaceNames = new Set();
+    const dayPlans = [];
 
-    // Map buckets to plans directly (No mutation of original buckets)
-    return dayBuckets.map((bucket) => {
+    // 2. Count days per region to determine K for clustering
+    const regionDayCounts = {};
+    dayBuckets.forEach(b => {
+        regionDayCounts[b.region_id] = (regionDayCounts[b.region_id] || 0) + 1;
+    });
+
+    // 3. Pre-calculate Clusters for each region
+    const regionClusters = {};
+    for (const [regionId, places] of Object.entries(regionGroups)) {
+        const k = regionDayCounts[regionId] || 1;
+        regionClusters[regionId] = clusterPlaces(places, k);
+    }
+
+    // 4. Track which cluster index to use next for each region
+    const nextClusterIndex = {};
+
+    // 5. Build Day Plans
+    for (const bucket of dayBuckets) {
         const dayPlan = {
             day: bucket.day,
             region_id: bucket.region_id,
             region_name: bucket.region_name,
-            places: {
-                main: [],
-                optional: [],
-            },
+            places: { main: [], optional: [] },
         };
 
-        // Filter places for this region
-        let regionPlaces = availablePlaces.filter(
-            (p) => p.region_id === bucket.region_id && !usedPlaceNames.has(p.name)
-        );
+        // Get the specific cluster for this day
+        const currentClusterIdx = nextClusterIndex[bucket.region_id] || 0;
+        let dayPlaces = [];
 
-        // Define 5 Main Slots for a balanced day
+        if (regionClusters[bucket.region_id] && regionClusters[bucket.region_id][currentClusterIdx]) {
+            dayPlaces = regionClusters[bucket.region_id][currentClusterIdx];
+        } else {
+            // Fallback: use all region places if clustering failed
+            dayPlaces = regionGroups[bucket.region_id] || [];
+        }
+
+        // Increment cluster index for next day in this region
+        nextClusterIndex[bucket.region_id] = currentClusterIdx + 1;
+
+        // Filter out already used places
+        let availableDayPlaces = dayPlaces.filter(p => !usedPlaceNames.has(p.name));
+
+        // Define 5 Main Slots
         const mainSlots = [
             { type: "Morning Activity", allowedTimes: ["morning", "anytime"], priorityCategory: "nature" },
             { type: "Culture/Daytime", allowedTimes: ["morning", "afternoon", "anytime"], priorityCategory: "heritage" },
@@ -53,59 +78,53 @@ export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
             { type: "Dinner/Nightlife", allowedTimes: ["dinner", "evening", "nightlife"], priorityCategory: "food" }
         ];
 
-        // Track categories allocated today
-        const categoryCounts = {
-            nature: 0,
-            heritage: 0,
-            food: 0,
-            nightlife: 0,
-            shopping: 0,
-            other: 0
-        };
-
+        const categoryCounts = { nature: 0, heritage: 0, food: 0, nightlife: 0, shopping: 0, other: 0 };
         let lastSubcategory = null;
         let anchorCoords = null;
 
-        // Fill Main Slots
+        // Fill Main Slots (Nearest Neighbor Chain)
         for (const slot of mainSlots) {
-            if (regionPlaces.length === 0) break;
+            if (availableDayPlaces.length === 0) break;
 
-            const candidate = findBestCandidate(regionPlaces, slot, lastSubcategory, categoryCounts, anchorCoords);
+            const candidate = findBestCandidate(availableDayPlaces, slot, lastSubcategory, categoryCounts, anchorCoords);
 
             if (candidate) {
-                // If it is day 1, set anchor coordinates
+                // Set anchor for the day (first main place)
                 if (!anchorCoords && candidate.lat && candidate.lon) {
                     anchorCoords = { lat: candidate.lat, lon: candidate.lon };
                 }
-                // FORCE PRIORITY CONSISTENCY: Main array = "main" priority
+
                 dayPlan.places.main.push({ ...candidate, priority: "main" });
                 usedPlaceNames.add(candidate.name);
                 lastSubcategory = candidate.subcategory || "other";
 
-                // Update counts
                 const cat = candidate.category || "other";
                 categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
 
-                // Remove from available pool
-                regionPlaces = regionPlaces.filter((p) => p.name !== candidate.name);
+                availableDayPlaces = availableDayPlaces.filter((p) => p.name !== candidate.name);
             }
         }
 
-        // Fill 3 Optional Slots (Anytime/Evening)
+        // Fill 3 Optional Slots
         for (let i = 0; i < 3; i++) {
-            if (regionPlaces.length === 0) break;
-            // Just pick high priority remaining
-            const candidate = regionPlaces.find(p => p.priority === "main") || regionPlaces[0];
+            if (availableDayPlaces.length === 0) break;
+
+            // For optional, stick to the anchor heavily
+            const candidate = findBestCandidate(availableDayPlaces,
+                { allowedTimes: ["evening", "anytime"], priorityCategory: "any", type: "Optional" },
+                null, categoryCounts, anchorCoords);
+
             if (candidate) {
-                // FORCE PRIORITY CONSISTENCY: Optional array = "optional" priority
                 dayPlan.places.optional.push({ ...candidate, priority: "optional" });
                 usedPlaceNames.add(candidate.name);
-                regionPlaces = regionPlaces.filter(p => p.name !== candidate.name);
+                availableDayPlaces = availableDayPlaces.filter(p => p.name !== candidate.name);
             }
         }
 
-        return dayPlan;
-    });
+        dayPlans.push(dayPlan);
+    }
+
+    return dayPlans;
 }
 
 function findBestCandidate(places, slot, lastSubcategory, categoryCounts, anchorCoords) {
@@ -115,60 +134,34 @@ function findBestCandidate(places, slot, lastSubcategory, categoryCounts, anchor
     for (const place of places) {
         let score = 0;
 
-        // Proximity Bonus (V1 Clustering)
+        // 1. Proximity to Anchor (The "Magnet") - Critical for Day Coherence
         if (anchorCoords && place.lat && place.lon) {
             const dist = getDistance(anchorCoords.lat, anchorCoords.lon, place.lat, place.lon);
-
-            if (dist !== null) {
-                if (dist < 5) score += 100;      // Very close! (High priority)
-                else if (dist < 10) score += 40;  // Reasonable distance
-                else if (dist > 15) score -= 30;  // Too far (Penalty)
-            }
+            if (dist < 5) score += 80;
+            else if (dist < 10) score += 40;
+            else score -= 20; // Penalty for drifting too far from day's center
         }
 
-        // 1. Time Match
+        // 2. Time Match
         if (place.best_time && slot.allowedTimes.includes(place.best_time)) {
-            if (place.best_time === slot.allowedTimes[0]) score += 50; // Perfect match
-            else score += 20; // Acceptable match
+            if (place.best_time === slot.allowedTimes[0]) score += 50;
+            else score += 20;
         } else if (place.best_time === "anytime") {
             score += 10;
         } else {
-            score -= 50; // Wrong time (e.g. Nightlife in Morning)
+            score -= 50;
         }
 
-        // 2. Category Priority for Slot
-        if (place.category === slot.priorityCategory) {
-            score += 20;
-        }
+        // 3. Category & Diversity
+        if (place.category === slot.priorityCategory) score += 20;
+        if (place.category === "heritage" && categoryCounts["heritage"] === 0) score += 40;
+        if (place.category === "nightlife" && categoryCounts["nightlife"] >= 1 && slot.type !== "Dinner/Nightlife") score -= 50;
 
-        // 3. Diversity Logic (Heritage Boost, Nightlife Limiting)
-        if (place.category === "heritage" && categoryCounts["heritage"] === 0) {
-            score += 40;
-        }
-        if (place.category === "shopping" && categoryCounts["shopping"] === 0) {
-            score += 10;
-        }
+        // 4. Variety (Subcategory)
+        if (place.subcategory === lastSubcategory) score -= 40;
 
-        if (place.category === "nightlife") {
-            if (categoryCounts["nightlife"] >= 1) score -= 50;
-            if (slot.type !== "Dinner/Nightlife") score -= 30;
-        }
-
-        if (place.category === "nature" && categoryCounts["nature"] >= 2) {
-            score -= 10;
-        }
-
-        // 4. Variety Check (Subcategory)
-        if (place.subcategory === lastSubcategory) {
-            score -= 40;
-        }
-
-        // 5. Main Priority Boost
-        if (place.priority === "main") {
-            score += 10;
-        }
-
-        // 6. (Removed) Lat/Lon Bonus - Strictly metadata for V1
+        // 5. Priority Boost
+        if (place.priority === "main") score += 10;
 
         if (score > bestScore) {
             bestScore = score;
@@ -177,24 +170,4 @@ function findBestCandidate(places, slot, lastSubcategory, categoryCounts, anchor
     }
 
     return bestPlace;
-}
-
-/**
- * Calculates distance between two coordinates in Kilometers.
- * Using Haversine Formula
- */
-function getDistance(lat1, lon1, lat2, lon2) {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
 }
