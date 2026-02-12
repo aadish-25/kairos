@@ -14,6 +14,16 @@ CURATION RULES:
   Generic chains (Cafe Coffee Day, McDonald's, Dominos) and generic family restaurants should always be "optional".
 - Prefer well-known, unique, or highly-regarded places over generic ones.
 - Provide at LEAST 15 places per region for high-density regions, and 10 for others.
+- VERY IMPORTANT: If multiple input places clearly refer to the SAME real-world location
+  and are very close to each other on the map, TREAT THEM AS ONE PLACE.
+  Examples:
+    - "Eden Beach" vs "Eden Beach - Blue flag Beach" in Pondicherry
+    - "Juhu Beach" vs "Juhu Chowpatty" in Mumbai
+    - "Marine Drive" vs "Marine Drive Promenade" in Mumbai
+  In such cases:
+    - Pick ONE clean, human-friendly name
+    - Merge their specialties conceptually
+    - Output ONLY ONE place entry in the final JSON.
 
 REGION RULES:
 - Do NOT invent places. Only use places from the input.
