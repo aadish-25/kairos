@@ -1,0 +1,116 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Kairos API",
+    "version": "1.0.0",
+    "description": "AI-powered persistent itinerary generator"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/itinerary/generate": {
+      "post": {
+        "summary": "Generate an itinerary",
+        "description": "Creates an itinerary based on user input, or suggests destinations if input is incomplete.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "days": { "type": "integer", "minimum": 1, "maximum": 7 },
+                  "destination": { "type": "string" },
+                  "budget": { "type": "number" },
+                  "source": { "type": "string" }
+                },
+                "required": ["days"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Itinerary generated or suggestions provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "dayPlans": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/DayPlan" }
+                        },
+                        "suggestedDestinations": {
+                          "type": "array",
+                          "items": { "type": "object" }
+                        },
+                        "nextAction": {
+                          "type": "string",
+                          "enum": ["GENERATE_ITINERARY", "SUGGEST_DESTINATION"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Check system health",
+        "description": "Verifies that the server, Redis, and AI Service are operational.",
+        "responses": {
+          "200": { "description": "System is healthy" },
+          "503": { "description": "One or more services are down" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DayPlan": {
+        "type": "object",
+        "properties": {
+          "day": { "type": "integer" },
+          "region_name": { "type": "string" },
+          "places": {
+            "type": "object",
+            "properties": {
+              "main": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Place" }
+              },
+              "optional": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Place" }
+              }
+            }
+          }
+        }
+      },
+      "Place": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "subcategory": { "type": "string" },
+          "lat": { "type": "number", "nullable": true },
+          "lon": { "type": "number", "nullable": true },
+          "short_description": { "type": "string" },
+          "priority": { "type": "string", "enum": ["main", "optional"] }
+        }
+      }
+    }
+  }
+}
