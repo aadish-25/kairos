@@ -14,7 +14,7 @@ function getCategoryFromTags(tags) {
 }
 
 function normalizeRawPlaces(rawPlaces) {
-  return rawPlaces
+  const normalized = rawPlaces
     .filter((p) => p.tags && p.tags.name)
     .map((p) => {
       const tags = p.tags || {};
@@ -30,6 +30,58 @@ function normalizeRawPlaces(rawPlaces) {
       };
     })
     .filter((p) => p.lat && p.lon);
+
+  return dedupePlaces(normalized);
+}
+
+// Simple place deduper:
+// - normalize name (case + punctuation)
+// - if another place with same normalized name exists within ~300m, keep only one
+function dedupePlaces(places) {
+  const SEEN = new Map(); // key -> kept place
+  const MAX_DIST_KM = 0.3;
+
+  for (const place of places) {
+    const key = normalizeName(place.name);
+    const existing = SEEN.get(key);
+
+    if (!existing) {
+      SEEN.set(key, place);
+      continue;
+    }
+
+    // If coords missing on either, just keep the first one
+    if (!place.lat || !place.lon || !existing.lat || !existing.lon) {
+      continue;
+    }
+
+    const dist = getDistanceKm(existing.lat, existing.lon, place.lat, place.lon);
+    if (dist > MAX_DIST_KM) {
+      // Far apart even with similar name – treat as distinct by appending a suffix key
+      SEEN.set(`${key}:${places.indexOf(place)}`, place);
+    }
+    // else: same name, close by → treat as duplicate, keep existing
+  }
+
+  return Array.from(SEEN.values());
+}
+
+function normalizeName(name) {
+  return (name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 export { normalizeRawPlaces };
