@@ -36,9 +36,7 @@ These items address known limitations in the current V1 implementation and aim t
 **Problem:** The system treats "Cafe Coffee Day" and "CCD" as different places if Overpass returns them separately.
 **Solution:**
 
-- Implement a deduplication layer using:
-  - **Fuzzy Name Matching** (Levenshtein distance).
-  - **Geo-Proximity Check** (If names are similar AND distance < 100m => Duplicate).
+- **Implementation:** Deduplication layer using Fuzzy Name Matching (Levenshtein) + Geo-Proximity (<100m).
 
 ## 5. Cost Modeling (Future)
 
@@ -48,7 +46,16 @@ These items address known limitations in the current V1 implementation and aim t
 - Add price tier tagging (`$`, `$$`, `$$$`) to places.
 - Implement a budget estimator based on selected activities and dining spots.
 
+## 6. Robust Geocoding Fallback
+
+**Problem:** V1 uses a "Round-Robin" workaround for places with missing coordinates (`null` lat/lon), which introduces artificial randomness and lowers clustering quality.
+**Solution:**
+
+- **Geocoding Service:** Integrate a fallback geocoder (e.g., Nominatim or Google Maps API).
+- **Logic:** If Overpass fails to provide coordinates, query the fallback service by place name + region.
+- **Goal:** Achieve 100% true coordinate coverage to eliminate the need for random distribution.
+
 ---
 
 _Created: Feb 2026_
-_Ref: Feedback Analysis_
+_Updated: Feb 12, 2026_
