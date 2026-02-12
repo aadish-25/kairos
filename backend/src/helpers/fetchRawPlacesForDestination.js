@@ -14,12 +14,28 @@ async function fetchRawPlacesForDestination(destination) {
   }
 
   const [south, north, west, east] = geoRes.data[0].boundingbox.map(Number);
+  const lat = parseFloat(geoRes.data[0].lat);
+  const lon = parseFloat(geoRes.data[0].lon);
+
+  // Extract OSM ID for Area Querying
+  const osmId = geoRes.data[0].osm_id;
+  const osmType = geoRes.data[0].osm_type;
+
+  // Calculate Overpass Area ID (Relation + 3600000000, Way + 2400000000)
+  let areaId = null;
+  if (osmType === 'relation') {
+    areaId = 3600000000 + parseInt(osmId);
+  } else if (osmType === 'way') {
+    areaId = 2400000000 + parseInt(osmId);
+  }
 
   const rawPlaces = await fetchPlacesForBoundingBox({
     south,
     west,
     north,
     east,
+    areaId, // Pass the calculated Area ID
+    centroid: { lat, lon }, // Pass centroid for strict distance filtering
     anchorLimit: 50,
     lifestyleLimit: 30,
     extrasLimit: 20,

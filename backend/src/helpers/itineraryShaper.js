@@ -50,6 +50,14 @@ function decideItineraryShape(days, destinationContext) {
         remainingDays -= allocatedDays;
     }
 
+    // If we still have leftover days after assigning based on recommended_days,
+    // allocate the remainder to the last region so that total_days is fully covered.
+    if (remainingDays > 0 && regions_plan.length > 0) {
+        const lastRegion = regions_plan[regions_plan.length - 1];
+        lastRegion.days += remainingDays;
+        remainingDays = 0;
+    }
+
     // Single stay correction
     if (stay_type === "single" && regions_plan.length > 0) {
         regions_plan[0].stay_required = true;

@@ -52,6 +52,22 @@ async function runOverpassQuery(query) {
   );
 }
 
+// Helper to calculate Haversine distance
+function getDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+    Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
  * Fetch places for a bounding box using three balanced queries.
  * For large areas (like state-level Goa), we use lighter queries
@@ -63,6 +79,9 @@ async function fetchPlacesForBoundingBox({
   west,
   north,
   east,
+  centroid, // Now accepting centroid for strict filtering
+  areaId = null, // New: Area ID for precise boundary queries
+  mockResponse = null, // TEST: Allow injecting mock data
   anchorLimit = 50,
   lifestyleLimit = 30,
   extrasLimit = 20,
@@ -73,100 +92,198 @@ async function fetchPlacesForBoundingBox({
   const bbox = `${south},${west},${north},${east}`;
 
   console.log(`[Overpass] Fetching for ${bbox} (Size: ${latDiff.toFixed(2)}x${lonDiff.toFixed(2)})`);
-  console.log(`[Overpass] Large Area Mode: ${isLargeArea}`);
+  if (areaId) console.log(`[Overpass] Area Query Active: ID ${areaId}`);
+  if (centroid) console.log(`[Overpass] Centroid Filter Active: ${centroid.lat}, ${centroid.lon}`);
 
   const timeout = isLargeArea ? 90 : 45;
 
-  // Query A: "Anchor" places — attractions worth travelling for
-  // For large areas: use node for most, nwr only for beaches (mapped as polygons)
-  // Use specific historic subtags (fort, monument, castle) NOT broad "historic" which is too heavy
+  // QUERY GENERATOR
+  // If areaId is present, we use `area(id)->.searchArea` and filter by it.
+  // If not, we fall back to `(bbox)`.
+  const diffC = areaId ? `(area.searchArea)` : `(${bbox})`;
+
+  let areaHeader = "";
+  if (areaId) {
+    areaHeader = `area(${areaId})->.searchArea;`;
+  }
+
+  // Query A: "Anchor" places
   const anchorQuery = isLargeArea
     ? `
       [out:json][timeout:${timeout}];
+      ${areaHeader}
       (
-        nwr["natural"="beach"](${bbox});
-        node["historic"="fort"](${bbox});
-        node["historic"="castle"](${bbox});
-        node["historic"="monument"](${bbox});
-        node["historic"="ruins"](${bbox});
-        node["tourism"="attraction"](${bbox});
-        node["tourism"="museum"](${bbox});
-        node["tourism"="viewpoint"](${bbox});
-        node["natural"="peak"](${bbox});
+        nwr["natural"="beach"]${diffC};
+        node["historic"="fort"]${diffC};
+        node["historic"="castle"]${diffC};
+        node["historic"="monument"]${diffC};
+        node["historic"="ruins"]${diffC};
+        node["tourism"="attraction"]${diffC};
+        node["tourism"="museum"]${diffC};
+        node["tourism"="viewpoint"]${diffC};
+        node["natural"="peak"]${diffC};
       );
-      out tags center ${anchorLimit};
+      out center ${anchorLimit};
     `
     : `
       [out:json][timeout:${timeout}];
+      ${areaHeader}
       (
-        nwr["natural"="beach"](${bbox});
-        nwr["historic"](${bbox});
-        nwr["tourism"="attraction"](${bbox});
-        nwr["tourism"="museum"](${bbox});
-        nwr["tourism"="viewpoint"](${bbox});
-        nwr["leisure"="park"](${bbox});
-        nwr["leisure"="nature_reserve"](${bbox});
+        nwr["natural"="beach"]${diffC};
+        nwr["historic"]${diffC};
+        nwr["tourism"="attraction"]${diffC};
+        nwr["tourism"="museum"]${diffC};
+        nwr["tourism"="viewpoint"]${diffC};
+        nwr["leisure"="park"]${diffC};
+        nwr["leisure"="nature_reserve"]${diffC};
       );
-      out tags center ${anchorLimit};
+      out center ${anchorLimit};
     `;
 
-  // Query B: "Lifestyle" places — food & drink
+  // Query B: "Lifestyle" places
   const lifestyleQuery = `
     [out:json][timeout:${timeout}];
+    ${areaHeader}
     (
-      node["amenity"="restaurant"](${bbox});
-      node["amenity"="cafe"](${bbox});
-      node["amenity"="ice_cream"](${bbox});
-      node["shop"="bakery"](${bbox});
+      node["amenity"="restaurant"]${diffC};
+      node["amenity"="cafe"]${diffC};
+      node["amenity"="ice_cream"]${diffC};
+      node["shop"="bakery"]${diffC};
     );
-    out tags center ${lifestyleLimit};
+    out center ${lifestyleLimit};
   `;
 
-  // Query C: "Extras" — nightlife, shopping, relaxation
+  // Query C: "Extras"
   const extrasQuery = `
     [out:json][timeout:${timeout}];
+    ${areaHeader}
     (
-      node["amenity"="bar"](${bbox});
-      node["amenity"="nightclub"](${bbox});
-      node["amenity"="pub"](${bbox});
-      node["shop"="mall"](${bbox});
-      node["leisure"="spa"](${bbox});
+      node["amenity"="bar"]${diffC};
+      node["amenity"="nightclub"]${diffC};
+      node["amenity"="pub"]${diffC};
+      node["shop"="mall"]${diffC};
+      node["leisure"="spa"]${diffC};
     );
-    out tags center ${extrasLimit};
+    out center ${extrasLimit};
   `;
 
   // Run all three queries
-  console.log(`[Overpass] Fetching anchors (limit ${anchorLimit})...`);
   let anchors = [];
-  try {
-    anchors = await runOverpassQuery(anchorQuery);
-    console.log(`[Overpass] Got ${anchors.length} anchor places`);
-  } catch (err) {
-    console.error("[Overpass] Anchor query failed:", err.message);
-  }
-
-  console.log(`[Overpass] Fetching lifestyle (limit ${lifestyleLimit})...`);
   let lifestyle = [];
-  try {
-    lifestyle = await runOverpassQuery(lifestyleQuery);
-    console.log(`[Overpass] Got ${lifestyle.length} lifestyle places`);
-  } catch (err) {
-    console.error("[Overpass] Lifestyle query failed:", err.message);
-  }
-
-  console.log(`[Overpass] Fetching extras (limit ${extrasLimit})...`);
   let extras = [];
-  try {
-    extras = await runOverpassQuery(extrasQuery);
-    console.log(`[Overpass] Got ${extras.length} extra places`);
-  } catch (err) {
-    console.error("[Overpass] Extras query failed:", err.message);
+
+  if (mockResponse) {
+    console.log(`[Overpass] MOCK MODE: Using ${mockResponse.length} mock places.`);
+    anchors = mockResponse;
+  } else {
+    console.log(`[Overpass] Fetching anchors (limit ${anchorLimit})...`);
+    try {
+      anchors = await runOverpassQuery(anchorQuery);
+      console.log(`[Overpass] Got ${anchors.length} anchor places`);
+    } catch (err) {
+      console.error("[Overpass] Anchor query failed:", err.message);
+    }
+
+    console.log(`[Overpass] Fetching lifestyle (limit ${lifestyleLimit})...`);
+    try {
+      lifestyle = await runOverpassQuery(lifestyleQuery);
+      console.log(`[Overpass] Got ${lifestyle.length} lifestyle places`);
+    } catch (err) {
+      console.error("[Overpass] Lifestyle query failed:", err.message);
+    }
+
+    console.log(`[Overpass] Fetching extras (limit ${extrasLimit})...`);
+    try {
+      extras = await runOverpassQuery(extrasQuery);
+      console.log(`[Overpass] Got ${extras.length} extra places`);
+    } catch (err) {
+      console.error("[Overpass] Extras query failed:", err.message);
+    }
   }
 
-  const combined = [...anchors, ...lifestyle, ...extras];
-  console.log(`[Overpass] Total combined: ${combined.length} places`);
+  // FILTERING: Geo Checks
+  // Default strict radius for pure bbox queries
+  const MAX_RADIUS_KM_STRICT = 30;
+  // Very loose sanity radius when using areaId (just to catch completely wrong results)
+  const MAX_RADIUS_KM_AREA_SANITY = 500;
 
-  return combined;
+  const allPlaces = [...anchors, ...lifestyle, ...extras].map((place) => {
+    if (!place.lat && place.center) {
+      place.lat = place.center.lat;
+      place.lon = place.center.lon;
+    }
+    return place;
+  });
+
+  // If we have an areaId, we TRUST the OSM admin boundary and do NOT apply
+  // the strict 30km centroid clamp. We only use a very loose sanity radius.
+  if (areaId) {
+    if (centroid) {
+      console.log(
+        `[GeoFilter] Area-based query. Using ONLY loose sanity radius ${MAX_RADIUS_KM_AREA_SANITY}km from centroid ${centroid.lat}, ${centroid.lon}`
+      );
+    } else {
+      console.log("[GeoFilter] Area-based query with no centroid. Returning all places from area.");
+      return allPlaces;
+    }
+
+    const filtered = allPlaces.filter((place) => {
+      if (!place.lat || !place.lon) return true;
+      const dist = getDistance(centroid.lat, centroid.lon, place.lat, place.lon);
+      if (dist > MAX_RADIUS_KM_AREA_SANITY) {
+        console.log(
+          `[GeoFilter] Discarding ${place.tags?.name || "unknown"} - Dist: ${dist.toFixed(
+            1,
+          )}km (beyond sanity radius)`
+        );
+        return false;
+      }
+      return true;
+    });
+
+    console.log(
+      `[Overpass] Area-based: returning ${filtered.length} places after loose sanity filtering (raw ${allPlaces.length})`,
+    );
+    return filtered;
+  }
+
+  // Legacy path: no areaId, use bbox + strict radius
+  if (centroid) {
+    console.log(
+      `[GeoFilter] BBox-only query. Centroid: ${centroid.lat}, ${centroid.lon}. Max Radius: ${MAX_RADIUS_KM_STRICT}km`,
+    );
+  } else {
+    console.warn("[GeoFilter] BBox-only query with no centroid.");
+  }
+
+  const strictCombined = allPlaces.filter((place) => {
+    if (!place.lat || !place.lon) {
+      return true;
+    }
+
+    const buffer = 0.005;
+    const inLat = place.lat >= south - buffer && place.lat <= north + buffer;
+    const inLon = place.lon >= west - buffer && place.lon <= east + buffer;
+    if (!inLat || !inLon) return false;
+
+    if (centroid && centroid.lat && centroid.lon) {
+      const dist = getDistance(centroid.lat, centroid.lon, place.lat, place.lon);
+      if (dist > MAX_RADIUS_KM_STRICT) {
+        console.log(
+          `[GeoFilter] Discarding ${place.tags?.name || "unknown"} - Dist: ${dist.toFixed(1)}km`,
+        );
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  console.log(
+    `[Overpass] BBox-only: Total after strict geo-filtering: ${strictCombined.length} places (of raw ${allPlaces.length})`,
+  );
+
+  return strictCombined;
 }
 
 export { fetchPlacesForBoundingBox };
