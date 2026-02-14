@@ -11,6 +11,7 @@ class Place(BaseModel):
     best_time: str = "anytime"
     lat: Optional[float] = None
     lon: Optional[float] = None
+    meal_type: Optional[Literal["breakfast", "lunch", "dinner", "cafe", "bar"]] = None
 
 
 class Region(BaseModel):
