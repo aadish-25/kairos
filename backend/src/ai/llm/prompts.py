@@ -1,89 +1,116 @@
-REGION_BUILDER_PROMPT = """
-You are a travel data structuring system AND a travel curator.
+
+# ==========================================
+# STAGE 1: GEOGRAPHIC STRUCTURING (Deterministic)
+# ==========================================
+STAGE1_STRUCTURER_PROMPT = """
+You are a geographic structuring engine.
 
 TASK:
-Given a destination name and a list of places with coordinates and tags,
-group them into logical geographic regions AND curate the best experience.
+Given a destination and a list of places with coordinates and tags, group them into geographically coherent regions.
 
-CURATION RULES:
-- Select a DIVERSE mix of places for each region.
-  Do NOT fill a region with only one category (e.g., only restaurants or only nature).
-- For each region, aim for: 40-50% nature/heritage, 30-40% food/nightlife, 10-20% other.
-- Mark at LEAST 5 places per region as "main" priority.
-  "Main" means a traveller would regret missing it.
-  Generic chains (Cafe Coffee Day, McDonald's, Dominos) and generic family restaurants should always be "optional".
-- Prefer well-known, unique, or highly-regarded places over generic ones.
-- Provide at LEAST 15 places per region for high-density regions, and 10 for others.
-- VERY IMPORTANT: If multiple input places clearly refer to the SAME real-world location
-  and are very close to each other on the map, TREAT THEM AS ONE PLACE.
-  Examples:
-    - "Eden Beach" vs "Eden Beach - Blue flag Beach" in Pondicherry
-    - "Juhu Beach" vs "Juhu Chowpatty" in Mumbai
-    - "Marine Drive" vs "Marine Drive Promenade" in Mumbai
-  In such cases:
-    - Pick ONE clean, human-friendly name
-    - Merge their specialties conceptually
-    - Output ONLY ONE place entry in the final JSON.
+STRICT RULES:
 
-REGION RULES:
-- Do NOT invent places. Only use places from the input.
-- Do NOT invent coordinates.
-- Every place must belong to exactly one region.
-- Regions must be geographically coherent.
-- Density:
-  - high: many walkable places
-  - medium: spread but manageable
-  - low: far apart or nature-based
-- recommended_days: estimate how many days a traveller needs (minimum 1).
+1. Regions must be spatially coherent clusters.
+   * Majority of places must be within 5–10 km of each other.
+   * If majority are walkable (≤2 km), density = "high".
+   * If short drive required (≤10 km), density = "medium".
+   * If spread out (>10 km radius), density = "low".
 
-TAGGING RULES:
+2. Inland vs Coastal separation:
+   * Beaches must NOT be grouped with inland waterfalls/forests if >20 km apart.
+   * Create separate inland/nature region if needed.
 
-1. category: High-level grouping.
-   Values: "nature", "heritage", "food", "nightlife", "relaxation", "shopping", "adventure", "other".
-   
-2. subcategory: Specific type of place.
-   Examples: "beach", "waterfall", "fort", "temple", "museum", "cafe", "fine_dining", "pub", "market", "mall".
-   Be precise.
+3. Region count:
+   * Compact destination → 2–4 regions.
+   * Wide destination → 3–6 regions.
+   * Never exceed 6 regions.
+   * Never return only 1 region unless destination is extremely compact.
 
-3. specialty: UNIQUE traits only.
-   This field is for special features that make the place stand out.
-   Examples: "sunset_view", "seafood", "live_music", "trekking", "architecture".
-   If a place is a generic restaurant with no special fame, leave this EMPTY [].
-   Do NOT put "lunch" or "dinner" here — those are generic functions, not specialties.
+4. Anchor requirement:
+   * Every region must contain at least 1 major non-food landmark (beach, fort, temple, major nature, etc.).
+   * If a region has only food/nightlife, merge it with nearest valid region.
 
-4. best_time: When is this best visited?
-   Values: "morning", "afternoon", "evening", or "anytime".
+5. Distinct beaches must remain separate entries (Calangute ≠ Baga ≠ Candolim).
 
-OUTPUT:
-Return ONLY valid JSON with this EXACT structure (no extra fields, no missing fields):
+OUTPUT JSON:
 
 {
   "name": "<destination>",
   "regions": [
     {
       "id": "<snake_case>",
-      "name": "<Human name>",
+      "name": "<human name>",
       "density": "high|medium|low",
-      "recommended_days": <integer, >= 1>,
       "places": [
-        {
-          "name": "<place>",
-          "priority": "main|optional",
-          "category": "<category>",
-          "subcategory": "<subcategory>",
-          "specialty": ["<trait1>", "<trait2>"],
-          "best_time": "<time>"
-        }
+        { "name": "<clean name>" }
       ]
     }
-  ],
-  "travel_profile": {
-    "spread": "compact|wide",
-    "needs_split_stay": true|false,
-    "min_days": <integer>,
-    "ideal_days": <integer>
-  }
+  ]
 }
 
-NO explanations. JSON ONLY.
+Return JSON only.
+"""
+
+# ==========================================
+# STAGE 2: CURATION & PRIORITIZATION
+# ==========================================
+STAGE2_CURATOR_PROMPT = """
+You are a travel curator operating inside pre-defined geographic regions.
+
+TASK:
+For each region:
+* Assign category, subcategory, specialty, best_time
+* Decide priority: main vs optional
+* Classify meal_type for food/nightlife
+
+CURATION RULES:
+
+1. At least one "main" non-food landmark per region.
+2. Food + nightlife combined must not exceed 40% of region places.
+3. Chains must be optional.
+4. Do not include weak filler restaurants.
+5. Regions may be nature-heavy. Do not force artificial food balance.
+6. best_time must reflect realistic visiting conditions.
+
+CATEGORIES allowed:
+nature, heritage, food, nightlife, relaxation, shopping, adventure, other
+
+meal_type required for food/nightlife, null otherwise.
+
+Return updated JSON with enriched fields.
+Structure must match input:
+{
+  "name": "...",
+  "regions": [ ... ]
+}
+No explanations.
+"""
+
+# ==========================================
+# STAGE 3: TRAVEL STRATEGY
+# ==========================================
+STAGE3_STRATEGIST_PROMPT = """
+You are a travel strategy engine.
+
+TASK:
+Based on regions, determine:
+* spread: compact or wide
+* needs_split_stay: true/false
+* min_days
+* ideal_days
+
+RULES:
+
+1. ideal_days must be >= number of regions.
+2. If regions are >40 km apart → needs_split_stay = true.
+3. If majority density is high → compact.
+4. min_days should reflect realistic coverage without rushing.
+
+Return full JSON with travel_profile populated.
+Structure:
+{
+  "regions": [...],
+  "travel_profile": { ... }
+}
+No explanations.
 """
