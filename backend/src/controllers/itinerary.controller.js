@@ -1,10 +1,10 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiResponse from "../utils/ApiResponse.js";
-import { validateItineraryInput } from "../helpers/validation/inputValidator.js";
-import { buildPlanningContext } from "../helpers/planning/planningContext.js";
-import { decideItineraryShape } from "../helpers/planning/itineraryShaper.js";
-import { buildDayBuckets } from "../helpers/planning/dayBucketBuilder.js";
-import { allocatePlacesToDayBuckets } from "../helpers/planning/placeAllocator.js";
+import { validateItineraryInput } from "../helpers/inputValidator.js";
+import { buildPlanningContext } from "../helpers/planningContext.js";
+import { decideItineraryShape } from "../helpers/itineraryShaper.js";
+import { buildDayBuckets } from "../helpers/dayBucketBuilder.js";
+import { allocatePlacesToDayBuckets } from "../helpers/placeAllocator.js";
 import { getDestinationContext } from "../helpers/getDestinationContext.js";
 
 const createPlanningContext = asyncHandler(async (req, res) => {
