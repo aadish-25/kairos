@@ -71,6 +71,7 @@ CURATION RULES:
 4. Do not include weak filler restaurants.
 5. Regions may be nature-heavy. Do not force artificial food balance.
 6. best_time must reflect realistic visiting conditions.
+7. Limit "main" priority to 3-5 top landmarks per region. Remaining non-food should be "optional".
 
 CATEGORIES allowed:
 nature, heritage, food, nightlife, relaxation, shopping, adventure, other
@@ -105,6 +106,7 @@ RULES:
 2. If regions are >40 km apart → needs_split_stay = true.
 3. If majority density is high → compact.
 4. min_days should reflect realistic coverage without rushing.
+5. If needs_split_stay is true, spread MUST be "wide", not "compact".
 
 Return full JSON with travel_profile populated.
 Structure:
