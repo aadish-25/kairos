@@ -69,7 +69,7 @@ CURATION RULES:
 2. Food + nightlife combined must not exceed 40% of region places.
 3. Chains must be optional.
 4. Do not include weak filler restaurants.
-5. Regions may be nature-heavy. Do not force artificial food balance.
+5. Every region MUST include 2-4 food/restaurant places from the metadata pool. Nature-heavy regions should still include nearby cafes or restaurants.
 6. best_time must reflect realistic visiting conditions.
 7. Limit "main" priority to 3-5 top landmarks per region. Remaining non-food should be "optional".
 
