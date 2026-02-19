@@ -36,6 +36,10 @@ export async function getDestinationContext(destination) {
   // Hydrate with Lat/Lon from raw data
   hydrateDestinationContext(structuredContext, rawPlaces);
 
+  // [NEW] Hallucination Filter — remove LLM-invented places not in Overpass data
+  const { filterHallucinatedPlaces } = await import("./validation/filterHallucinatedPlaces.js");
+  filterHallucinatedPlaces(structuredContext, rawPlaces);
+
   // ---------------------------------------------------------
   // PHASE 4: PRODUCTION HARDENING PIPELINE
   // ---------------------------------------------------------
