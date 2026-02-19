@@ -12,6 +12,7 @@ app = FastAPI()
 def health():
     return {"status": "ok"}
 
+# Stage 1: Takes raw places and groups them into geographic regions (e.g. North Goa, South Goa)
 @app.post("/stage1")
 def stage1(payload: dict):
     try:
@@ -20,6 +21,7 @@ def stage1(payload: dict):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+# Stage 2: Takes each region and picks the best places for it (sets priority, category, best_time)
 @app.post("/stage2")
 def stage2(payload: dict):
     try:
@@ -28,6 +30,7 @@ def stage2(payload: dict):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+# Stage 3: Takes all curated regions and builds a travel profile (spread, min_days, split_stay)
 @app.post("/stage3")
 def stage3(payload: dict):
     try:
