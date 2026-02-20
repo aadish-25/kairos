@@ -79,9 +79,17 @@ export function decideItineraryShape(totalDays, destinationContext) {
         };
     });
 
-    // 3. Minimum Day Floor: every valid region gets at least 1 day
-    for (const r of regionsPlan) {
-        if (r.days === 0) r.days = 1;
+    // 3. Minimum Day Floor
+    // When fewer days than regions, keep only the top-scored regions
+    if (totalDays < regionsPlan.length) {
+        regionsPlan.length = totalDays;
+        for (const r of regionsPlan) {
+            r.days = 1;
+        }
+    } else {
+        for (const r of regionsPlan) {
+            if (r.days === 0) r.days = 1;
+        }
     }
 
     // Cap: no single region gets more than 50% of total days (unless only 1 region)
