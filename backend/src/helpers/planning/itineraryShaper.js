@@ -80,8 +80,16 @@ export function decideItineraryShape(totalDays, destinationContext) {
     });
 
     // 3. Minimum Day Floor
-    // When fewer days than regions, keep only the top-scored regions
-    if (totalDays < regionsPlan.length) {
+    // Short trips (< 3 days): Focus on single best region — no region-hopping
+    // 3+ days: Allow multi-region, but cap to available days
+    const MIN_DAYS_FOR_MULTI_REGION = 3;
+
+    if (totalDays < MIN_DAYS_FOR_MULTI_REGION) {
+        // Short trip: keep only the top-scored region
+        regionsPlan.length = 1;
+        regionsPlan[0].days = totalDays;
+    } else if (totalDays < regionsPlan.length) {
+        // Medium trip: keep top N regions that fit
         regionsPlan.length = totalDays;
         for (const r of regionsPlan) {
             r.days = 1;
