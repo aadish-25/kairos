@@ -30,7 +30,7 @@ export async function runTravelChain(destination, rawPlaces) {
         lat: p.lat,
         lon: p.lon,
         category: p.category,
-        tags: p.tags // needed for inland/coastal check
+        osm_keys: p.osm_keys // needed for inland/coastal check
     }));
 
     const structurerOutput = await runStage("stage1", { destination, places: minimalPlaces });
@@ -51,7 +51,7 @@ export async function runTravelChain(destination, rawPlaces) {
         minimalMetadataMap.set(p.name, {
             name: p.name,
             category: p.category,
-            tags: p.tags,
+            osm_keys: p.osm_keys,
             lat: p.lat,
             lon: p.lon,
             score: p.quality_score

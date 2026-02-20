@@ -188,7 +188,7 @@ function normalizeRawPlaces(rawPlaces) {
       lon: p.lon,
       category: category,
       raw_type: p.raw_type,
-      tags: Object.keys(tags), // list of keys
+      osm_keys: Object.keys(tags), // OSM metadata key names for debugging
       quality_score: Math.round(finalScore),
       day_slot: assignDaySlot(p),
       _debug: { raw: Math.round(rawScore), hub: Math.round(hubBonus), dens: p.hub_density }

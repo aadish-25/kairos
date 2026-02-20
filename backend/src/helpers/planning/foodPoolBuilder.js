@@ -24,13 +24,13 @@ const DINNER_SIGNALS = new Set([
 /**
  * Infer meal_type from place category, name, and available tag keys.
  * 
- * NOTE: After normalizeRawPlaces, `tags` is an ARRAY of key names (e.g. ["name", "cuisine", "amenity"]),
+ * NOTE: After normalizeRawPlaces, `osm_keys` is an ARRAY of key names (e.g. ["name", "cuisine", "amenity"]),
  * NOT a key-value object. So we infer from category, name, and tag key presence.
  */
 function inferMealType(place) {
     const category = (place.category || "").toLowerCase();
     const name = (place.name || "").toLowerCase();
-    const tagKeys = Array.isArray(place.tags) ? place.tags : Object.keys(place.tags || {});
+    const tagKeys = Array.isArray(place.osm_keys) ? place.osm_keys : Object.keys(place.osm_keys || {});
     const hasKey = (key) => tagKeys.includes(key);
 
     // 1. Cafe/bakery category → breakfast
@@ -86,7 +86,7 @@ export function buildFoodPool(rawPlaces) {
             meal_type: mealType,
             quality_score: place.quality_score || 0,
             day_slot: place.day_slot || assignDaySlot(place),
-            tags: place.tags,
+            osm_keys: place.osm_keys,
             _source: "food_pool"
         };
 
