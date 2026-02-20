@@ -62,12 +62,12 @@ const createPlanningContext = asyncHandler(async (req, res) => {
     new ApiResponse(
       200,
       {
-        planningContext,
-        suggestedDestinations,
-        itineraryShape,
-        destinationContext,
-        nextAction,
-        dayBuckets,
+        // planningContext,
+        // suggestedDestinations,
+        // itineraryShape,
+        // destinationContext,
+        // nextAction,
+        // dayBuckets,
         dayPlans,
       },
       "Planning context created successfully",
