@@ -79,25 +79,21 @@ export function decideItineraryShape(totalDays, destinationContext) {
         };
     });
 
-    // 3. Minimum Day Floor
-    // Short trips (< 3 days): Focus on single best region — no region-hopping
-    // 3+ days: Allow multi-region, but cap to available days
-    const MIN_DAYS_FOR_MULTI_REGION = 3;
+    // 3. Region Cap — ensure each region gets meaningful time
+    // Formula: max regions = ceil(totalDays / 2)
+    //   1-2 days → 1 region (focus, no hopping)
+    //   3-4 days → 2 regions (e.g. 2+1 or 2+2)
+    //   5-6 days → 3 regions
+    //   7+ days  → scales up
+    const maxRegions = Math.max(1, Math.ceil(totalDays / 2));
 
-    if (totalDays < MIN_DAYS_FOR_MULTI_REGION) {
-        // Short trip: keep only the top-scored region
-        regionsPlan.length = 1;
-        regionsPlan[0].days = totalDays;
-    } else if (totalDays < regionsPlan.length) {
-        // Medium trip: keep top N regions that fit
-        regionsPlan.length = totalDays;
-        for (const r of regionsPlan) {
-            r.days = 1;
-        }
-    } else {
-        for (const r of regionsPlan) {
-            if (r.days === 0) r.days = 1;
-        }
+    if (regionsPlan.length > maxRegions) {
+        regionsPlan.length = maxRegions;
+    }
+
+    // Ensure every region gets at least 1 day
+    for (const r of regionsPlan) {
+        if (r.days === 0) r.days = 1;
     }
 
     // Cap: no single region gets more than 50% of total days (unless only 1 region)

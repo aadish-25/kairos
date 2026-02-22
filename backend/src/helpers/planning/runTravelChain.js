@@ -1,25 +1,27 @@
 import axios from "axios";
 import ApiError from "../../utils/ApiError.js";
 import { validateAndRepairChain } from "./chainValidator.js";
+import { writeLog } from "../../utils/logger.js";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:9000";
 
 async function runStage(stageName, payload) {
     try {
-        console.log(`[TravelChain] Running ${stageName}...`);
+        writeLog('pipeline', `[TravelChain] Running ${stageName}...`);
         const res = await axios.post(`${AI_SERVICE_URL}/${stageName}`, payload);
         return res.data;
     } catch (error) {
-        console.error(`[TravelChain] ${stageName} Failed:`, error.message);
+        writeLog('ai_errors', `[TravelChain] ${stageName} Failed: ${error.message}`);
+        import('fs').then(fs => fs.writeFileSync('ai_error_debug.log', JSON.stringify(error.response?.data || error.message, null, 2)));
         if (error.response?.data) {
-            console.error(`[TravelChain] AI Error Details:`, JSON.stringify(error.response.data, null, 2));
+            writeLog('ai_errors', `[TravelChain] AI Error Details from ${stageName}:\n${JSON.stringify(error.response.data, null, 2)}`);
         }
         throw new ApiError(500, `AI Pipeline Failed at ${stageName}`);
     }
 }
 
 export async function runTravelChain(destination, rawPlaces) {
-    console.log(`[TravelChain] Starting V6 Pipeline for ${destination} (${rawPlaces.length} places)`);
+    writeLog('pipeline', `[TravelChain] Starting V6 Pipeline for ${destination} (${rawPlaces.length} places)`);
 
     // ----------------------------------------------------
     // STAGE 1: GEOGRAPHIC STRUCTURING (Deterministic)
@@ -30,22 +32,13 @@ export async function runTravelChain(destination, rawPlaces) {
         lat: p.lat,
         lon: p.lon,
         category: p.category,
-        osm_keys: p.osm_keys // needed for inland/coastal check
+        score: p.quality_score // Critical for AI to prioritize Baga Beach over unknown beaches
     }));
 
     const structurerOutput = await runStage("stage1", { destination, places: minimalPlaces });
 
-    // VALIDATION (Guardrail): Ensure we have regions
-    if (!structurerOutput.regions || structurerOutput.regions.length === 0) {
-        throw new ApiError(500, "Stage 1 failed to generate regions.");
-    }
-
     // ----------------------------------------------------
     // STAGE 2: CURATION (Enrichment) - PER REGION LOOP
-    // ----------------------------------------------------
-    // Context Limit Fix: We curate each region individually to avoid 429/413 errors.
-
-    // 1. Prepare minimal metadata pool (optimized)
     const minimalMetadataMap = new Map();
     rawPlaces.forEach(p => {
         minimalMetadataMap.set(p.name, {
@@ -71,7 +64,7 @@ export async function runTravelChain(destination, rawPlaces) {
         // Skip empty regions (shouldn't happen due to Stage 1 validation)
         if (regionMeta.length === 0) continue;
 
-        console.log(`[TravelChain] Curating Region: ${region.name} (${regionMeta.length} places)...`);
+        writeLog('pipeline', `[TravelChain] Curating Region: ${region.name} (${regionMeta.length} places)...`);
 
         // Payload for this specific region
         const miniStructure = {
@@ -91,11 +84,11 @@ export async function runTravelChain(destination, rawPlaces) {
                 // do nothing
             } else {
                 // Fallback if structure is wrong
-                console.warn(`[TravelChain] Warning: Stage 2 return invalid structure for ${region.name}. Using raw.`);
+                writeLog('ai_errors', `[TravelChain] Warning: Stage 2 return invalid structure for ${region.name}. Using raw.`);
                 enrichedRegions.push(region);
             }
         } catch (err) {
-            console.error(`[TravelChain] Failed to curate region ${region.name}. Using raw region as fallback.`);
+            writeLog('ai_errors', `[TravelChain] Failed to curate region ${region.name}. Using raw region as fallback.`);
             enrichedRegions.push(region); // Fallback to uncurated if Stage 2 fails
         }
     }

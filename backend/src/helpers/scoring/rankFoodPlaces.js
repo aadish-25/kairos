@@ -16,7 +16,8 @@ export function rankFoodPlaces(destinationContext) {
 
         // Separate food places for ranking (we modify them in-place with a score)
         region.places.forEach(place => {
-            if (place.category === 'food' || place.category === 'nightlife') {
+            const isFoodCategory = ['food', 'restaurant', 'cafe', 'nightlife'].includes(place.category);
+            if (isFoodCategory) {
                 const isMain = place.priority === 'main';
                 const specialtyCount = Array.isArray(place.specialty) ? place.specialty.length : 0;
 
@@ -27,9 +28,8 @@ export function rankFoodPlaces(destinationContext) {
                 // For now, stick to the prompt.
 
                 place.quality_score = score;
-            } else {
-                place.quality_score = 0;
             }
+            // Non-food places: preserve existing quality_score from normalizeRawPlaces/normalizePlaceCategories
         });
 
         // Debug log top food

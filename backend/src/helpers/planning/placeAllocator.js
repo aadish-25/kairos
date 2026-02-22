@@ -107,7 +107,9 @@ export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
                 usedPlaceNames.add(candidate.name);
                 availableAttractions = availableAttractions.filter(p => p.name !== candidate.name);
 
-                const sub = (candidate.subcategory || "other").toLowerCase();
+                let sub = (candidate.subcategory || candidate.category || "other").toLowerCase();
+                if (sub === "other") sub = (candidate.category || "other").toLowerCase();
+
                 subcategoryCounts[sub] = (subcategoryCounts[sub] || 0) + 1;
                 if (HEAVY_PHYSICAL.has(sub)) heavyCount++;
             }
@@ -249,6 +251,11 @@ export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
         let heavyMainCount = 0;
 
         for (const place of allDayPlaces) {
+            // DEBUG SCORE
+            if (place.name === 'Chapora Beach' || place.name.includes('Chapora') || place.name.includes('Fort')) {
+                console.log(`[Allocator Debug] Place: ${place.name}, cat: ${place.category}, q_score: ${place.quality_score}, prior: ${place.priority}`);
+            }
+
             const isFood = FOOD_CATEGORIES.has(place.category) || place._type === "meal";
             const sub = (place.subcategory || place.category || "other").toLowerCase();
             const isHeavy = HEAVY_PHYSICAL.has(sub);
@@ -298,13 +305,29 @@ export function allocatePlacesToDayBuckets(dayBuckets, destinationContext) {
         // Fill remaining optional slots from leftover attractions
         const optionalTarget = Math.max(0, 8 - dayPlan.places.main.length - dayPlan.places.optional.length);
         if (optionalTarget > 0) {
-            const leftover = availableAttractions
-                .filter(p => !usedPlaceNames.has(p.name))
-                .slice(0, optionalTarget);
+            const leftover = availableAttractions.filter(p => !usedPlaceNames.has(p.name));
 
+            let optionalCount = 0;
             for (const p of leftover) {
+                if (optionalCount >= optionalTarget) break;
+
+                let sub = (p.subcategory || p.category || "other").toLowerCase();
+                if (sub === "other") sub = (p.category || "other").toLowerCase();
+
+                // [Diversity Filter for Optionals] Prevent junkyard stuffing
+                if (subcategoryCounts[sub] >= 3) {
+                    continue;
+                }
+                // Allow a slight relaxation for museums/forts as optionals (max 2 total per day)
+                if ((sub === "museum" || sub === "fort") && subcategoryCounts[sub] >= 2) continue;
+                if (HEAVY_PHYSICAL.has(sub) && heavyCount >= MAX_HEAVY_PHYSICAL) continue;
+
                 dayPlan.places.optional.push({ ...p, priority: "optional" });
                 usedPlaceNames.add(p.name);
+
+                subcategoryCounts[sub] = (subcategoryCounts[sub] || 0) + 1;
+                if (HEAVY_PHYSICAL.has(sub)) heavyCount++;
+                optionalCount++;
             }
         }
 
@@ -341,7 +364,8 @@ function pickBestAttraction(places, allowedTimes, subcategoryCounts, heavyCount,
     let bestPlace = null;
 
     for (const place of places) {
-        const sub = (place.subcategory || place.category || "other").toLowerCase();
+        let sub = (place.subcategory || place.category || "other").toLowerCase();
+        if (sub === "other") sub = (place.category || "other").toLowerCase();
 
         // Hard filters
         if (subcategoryCounts[sub] >= 3) continue;  // Allow up to 3 of same subcategory (e.g. beaches)
