@@ -40,6 +40,10 @@ export async function getDestinationContext(destination) {
   const { filterHallucinatedPlaces } = await import("./validation/filterHallucinatedPlaces.js");
   filterHallucinatedPlaces(structuredContext, rawPlaces);
 
+  // [NEW] Category Normalizer — restore internal categories + quality_scores from raw data
+  const { normalizePlaceCategories } = await import("./validation/normalizePlaceCategories.js");
+  normalizePlaceCategories(structuredContext, rawPlaces);
+
   // ---------------------------------------------------------
   // PHASE 4: PRODUCTION HARDENING PIPELINE
   // ---------------------------------------------------------
@@ -85,10 +89,8 @@ export async function getDestinationContext(destination) {
 
   // 3. Schema & Category Enforcement
   const { validateSchema } = await import("./validation/validateSchema.js");
-  const { normalizeCategoryBySubcategory } = await import("./scoring/normalizeCategoryBySubcategory.js");
 
   validateSchema(structuredContext);
-  normalizeCategoryBySubcategory(structuredContext);
 
   // 4. Geo Validation (Reassign Outliers using Dynamic Radius)
   const { validateRegionCoherence } = await import("./geo/validateRegionCoherence.js");

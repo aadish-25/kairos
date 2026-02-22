@@ -2,14 +2,29 @@ import { assignDaySlot } from '../planning/assignDaySlots.js';
 
 function getCategoryFromTags(tags) {
   if (tags.natural === "beach") return "beach";
+  if (tags.natural === "peak") return "peak";
+  if (tags.natural === "cave_entrance") return "cave";
+  if (tags.natural === "water") return "lake";
+  if (tags.waterway === "waterfall") return "waterfall";
   if (tags.historic === "fort" || tags.historic === "castle") return "fort";
+  if (tags.historic === "palace") return "palace";
+  if (tags.historic === "monument") return "monument";
+  if (tags.historic === "ruins") return "ruins";
   if (tags.tourism === "museum") return "museum";
+  if (tags.tourism === "viewpoint") return "viewpoint";
+  if (tags.tourism === "zoo") return "zoo";
+  if (tags.tourism === "attraction") return "attraction";
+  if (tags.tourism === "camp_site") return "camping";
+  if (tags.amenity === "place_of_worship") return "temple";
+  if (tags.man_made === "ghat") return "ghat";
   if (tags.amenity === "restaurant") return "restaurant";
   if (tags.amenity === "cafe") return "cafe";
+  if (tags.amenity === "fast_food") return "restaurant";
+  if (tags.amenity === "ice_cream") return "cafe";
   if (tags.amenity === "bar" || tags.amenity === "pub" || tags.amenity === "nightclub") return "nightlife";
   if (tags.leisure === "park" || tags.leisure === "nature_reserve") return "park";
-  if (tags.tourism === "viewpoint") return "viewpoint";
-  if (tags.waterway === "waterfall") return "waterfall";
+  if (tags.leisure === "garden") return "garden";
+  if (tags.leisure === "spa") return "spa";
 
   // Fallback to generic tag keys
   return tags.tourism || tags.historic || tags.natural || tags.leisure || tags.amenity || "unknown";
@@ -36,7 +51,7 @@ function normalizeRawPlaces(rawPlaces) {
         tags: tags,
         category: getCategoryFromTags(tags),
         base_category: getCategoryFromTags(tags), // preserve original
-        raw_type: tags.tourism || tags.natural || tags.amenity || "other"
+        raw_type: tags.tourism || tags.natural || tags.amenity || tags.historic || tags.waterway || tags.man_made || tags.leisure || "other"
       };
     })
     .filter((p) => p.lat && p.lon);
@@ -53,7 +68,7 @@ function normalizeRawPlaces(rawPlaces) {
   });
 
   // 2. Calculate Commercial Density (Hub Signal)
-  // O(N^2) is fine for ~3500 items (approx 12M checks, <100ms in V8)
+  // O(N^2) is acceptable for ~500 items (Stage 0 limits). ~250K checks, <10ms in V8
   // We count "Amenities" within 1km
   const commercialPlaces = places.filter(p =>
     ['restaurant', 'cafe', 'nightlife', 'hotel', 'guest_house', 'hostel'].includes(p.category) ||
@@ -136,16 +151,27 @@ function normalizeRawPlaces(rawPlaces) {
     const tags = p.tags;
     const category = p.category;
 
-    // A. Category Base [PHASE 8: Fort/Waterfall boosted 60→75]
+    // A. Category Base Score
     let baseScore = 10;
     if (category === 'beach') baseScore = 70;
     else if (category === 'waterfall') baseScore = 75;
     else if (category === 'fort') baseScore = 75;
+    else if (category === 'palace') baseScore = 75;
+    else if (category === 'temple') baseScore = 70;
+    else if (category === 'ghat') baseScore = 70;
+    else if (category === 'monument') baseScore = 65;
     else if (category === 'island') baseScore = 60;
+    else if (category === 'cave') baseScore = 60;
+    else if (category === 'ruins') baseScore = 55;
     else if (category === 'museum') baseScore = 45;
+    else if (category === 'lake') baseScore = 45;
     else if (category === 'viewpoint') baseScore = 40;
+    else if (category === 'garden') baseScore = 40;
+    else if (category === 'zoo') baseScore = 40;
     else if (category === 'peak') baseScore = 35;
     else if (category === 'attraction') baseScore = 30;
+    else if (category === 'camping') baseScore = 30;
+    else if (category === 'spa') baseScore = 25;
 
     // B. Hub Bonus (Popularity Proxy)
     // log(1) = 0, log(10) = 2.3, log(50) = 3.9, log(100) = 4.6
@@ -162,13 +188,19 @@ function normalizeRawPlaces(rawPlaces) {
     if (tags.cuisine) metaScore += 5;
     if (tags.opening_hours) metaScore += 5;
 
-    // D. Commercial-Only Penalty [PHASE 8]
+    // D. Commercial-Only Penalty
     // Attractions with no tourism/natural signal are likely noise (wedding halls, bowling alleys)
     if (category === 'attraction' && !tags.tourism && !tags.natural && !tags.historic) {
       baseScore -= 10;
     }
 
-    const rawScore = baseScore + hubBonus + metaScore;
+    // E. Geoapify Importance Bonus
+    // Geoapify attaches a 0-1 importance score based on OSM wiki signals + foot traffic.
+    // Famous places (Baga Beach = ~0.8) get up to +40 bonus points.
+    const geoImportance = parseFloat(tags['geoapify:importance'] ?? 0);
+    const importanceBonus = geoImportance * 40;
+
+    const rawScore = baseScore + hubBonus + metaScore + importanceBonus;
 
     // E. Soft Scaling (0-100)
     let finalScore = 100 * (1 - Math.exp(-rawScore / 60));
@@ -177,7 +209,10 @@ function normalizeRawPlaces(rawPlaces) {
     // If a place has NO tourism signals at all, cap at 60 to prevent
     // noise like "Laxmi's Home" or "Thrill zone" from outranking landmarks.
     const hasTourismSignal = tags.wikipedia || tags.wikidata || tags.image
-      || tags.tourism || tags.natural || tags.historic;
+      || tags.tourism || tags.natural || tags.historic
+      || tags.waterway || tags.man_made || tags.leisure
+      || tags.amenity === 'place_of_worship'
+      || tags['geoapify:importance'];  // Geoapify places are always real named landmarks
     if (!hasTourismSignal && finalScore > 60) {
       finalScore = 60;
     }

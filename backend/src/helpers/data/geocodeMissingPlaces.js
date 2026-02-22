@@ -2,13 +2,14 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { writeLog } from "../../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AUDIT_LOG = path.join(__dirname, '../../data/geocoding.log');
 
 /**
- * Robust Logging: Writes to both terminal and data/geocoding.log
+ * Robust Logging: Writes to both terminal and centralized logs/geo_api.log
  */
 function logAudit(msg) {
     const timestamp = new Date().toISOString();
@@ -17,17 +18,8 @@ function logAudit(msg) {
     // Terminal log
     console.log(formattedMsg);
 
-    // File log
-    try {
-        const logDir = path.dirname(AUDIT_LOG);
-        if (!fs.existsSync(logDir)) {
-            console.log(`[Geocode Audit] Creating log directory: ${logDir}`);
-            fs.mkdirSync(logDir, { recursive: true });
-        }
-        fs.appendFileSync(AUDIT_LOG, formattedMsg + '\n');
-    } catch (err) {
-        console.error(`[Geocode Audit] Failed to write to log file: ${err.message}`);
-    }
+    // Centralized log
+    writeLog('geo_api', `[Geocode Audit] ${msg}`);
 }
 
 // OpenCage Geocoder (Primary)
