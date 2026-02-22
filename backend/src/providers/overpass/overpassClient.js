@@ -69,22 +69,24 @@ function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Fetch places for a bounding box using three balanced queries.
- * For large areas (like state-level Goa), we use lighter queries
- * to prevent timeouts — `node` instead of `nwr`, and specific
- * historic subtags instead of broad `historic`.
+ * Fetch places for a bounding box using dynamically built queries.
+ * Tags are provided by Stage 0 (pre-fetch AI) instead of being hardcoded.
  */
 async function fetchPlacesForBoundingBox({
   south,
   west,
   north,
   east,
-  centroid, // Now accepting centroid for strict filtering
-  areaId = null, // New: Area ID for precise boundary queries
-  mockResponse = null, // TEST: Allow injecting mock data
-  anchorLimit = 50,
-  lifestyleLimit = 30,
-  extrasLimit = 20,
+  centroid,
+  areaId = null,
+  mockResponse = null,
+  // Dynamic tag arrays from Stage 0
+  anchorTags = [],
+  lifestyleTags = [],
+  extrasTags = [],
+  anchorLimit = 300,
+  lifestyleLimit = 150,
+  extrasLimit = 50,
 }) {
   const latDiff = Math.abs(north - south);
   const lonDiff = Math.abs(east - west);
@@ -98,8 +100,6 @@ async function fetchPlacesForBoundingBox({
   const timeout = isLargeArea ? 90 : 45;
 
   // QUERY GENERATOR
-  // If areaId is present, we use `area(id)->.searchArea` and filter by it.
-  // If not, we fall back to `(bbox)`.
   const diffC = areaId ? `(area.searchArea)` : `(${bbox})`;
 
   let areaHeader = "";
@@ -107,65 +107,47 @@ async function fetchPlacesForBoundingBox({
     areaHeader = `area(${areaId})->.searchArea;`;
   }
 
-  // Query A: "Anchor" places
-  const anchorQuery = isLargeArea
-    ? `
+  // Tags that represent area features (ways/relations) — use 'nwr'
+  // All others use 'node' to prevent timeouts on large areas
+  const AREA_FEATURES = new Set(["beach", "park", "nature_reserve", "garden"]);
+
+  function buildQueryLines(tags) {
+    return tags.map(t => {
+      const element = AREA_FEATURES.has(t.value) ? "nwr" : "node";
+      return `        ${element}["${t.key}"="${t.value}"]${diffC};`;
+    }).join("\n");
+  }
+
+  // Build queries from dynamic tags
+  const anchorQuery = `
       [out:json][timeout:${timeout}];
       ${areaHeader}
       (
-        nwr["natural"="beach"]${diffC};
-        node["historic"="fort"]${diffC};
-        node["historic"="castle"]${diffC};
-        node["historic"="monument"]${diffC};
-        node["historic"="ruins"]${diffC};
-        node["tourism"="attraction"]${diffC};
-        node["tourism"="museum"]${diffC};
-        node["tourism"="viewpoint"]${diffC};
-        node["natural"="peak"]${diffC};
+${buildQueryLines(anchorTags)}
       );
-      out center ${anchorLimit};
-    `
-    : `
-      [out:json][timeout:${timeout}];
-      ${areaHeader}
-      (
-        nwr["natural"="beach"]${diffC};
-        nwr["historic"]${diffC};
-        nwr["tourism"="attraction"]${diffC};
-        nwr["tourism"="museum"]${diffC};
-        nwr["tourism"="viewpoint"]${diffC};
-        nwr["leisure"="park"]${diffC};
-        nwr["leisure"="nature_reserve"]${diffC};
-      );
-      out center ${anchorLimit};
+      out center ${anchorLimit} qt;
     `;
 
-  // Query B: "Lifestyle" places
   const lifestyleQuery = `
-    [out:json][timeout:${timeout}];
-    ${areaHeader}
-    (
-      node["amenity"="restaurant"]${diffC};
-      node["amenity"="cafe"]${diffC};
-      node["amenity"="ice_cream"]${diffC};
-      node["shop"="bakery"]${diffC};
-    );
-    out center ${lifestyleLimit};
-  `;
+      [out:json][timeout:${timeout}];
+      ${areaHeader}
+      (
+${buildQueryLines(lifestyleTags)}
+      );
+      out center ${lifestyleLimit} qt;
+    `;
 
-  // Query C: "Extras"
   const extrasQuery = `
-    [out:json][timeout:${timeout}];
-    ${areaHeader}
-    (
-      node["amenity"="bar"]${diffC};
-      node["amenity"="nightclub"]${diffC};
-      node["amenity"="pub"]${diffC};
-      node["shop"="mall"]${diffC};
-      node["leisure"="spa"]${diffC};
-    );
-    out center ${extrasLimit};
-  `;
+      [out:json][timeout:${timeout}];
+      ${areaHeader}
+      (
+${buildQueryLines(extrasTags)}
+      );
+      out center ${extrasLimit} qt;
+    `;
+
+  console.log(`[Overpass] Dynamic queries: ${anchorTags.length} anchor types, ${lifestyleTags.length} lifestyle types, ${extrasTags.length} extras types`);
+
 
   // Run all three queries
   let anchors = [];
