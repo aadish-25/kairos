@@ -114,7 +114,7 @@ OUTPUT JSON:
   ]
 }
 
-Return JSON only.
+CRITICAL INSTRUCTION: You MUST output ONLY VALID JSON. Do not write Python scripts, pseudo-code, or explanations. Do not generate code to process the data, you must process the data yourself and output the final JSON arrays.
 """
 
 # ==========================================
@@ -179,7 +179,16 @@ RULES:
 4. min_days should reflect realistic coverage without rushing.
 5. If needs_split_stay is true, spread MUST be "wide", not "compact".
 
-Return the entire input JSON exactly as it was provided, but add a new "travel_profile" alongside "regions".
-⚠️ CRITICAL: Do NOT truncate arrays or use "[...]". You must output every single place perfectly intact.
-No explanations.
+Return ONLY a JSON object containing the travel profile attributes.
+DO NOT return the regions array.
+
+Example Output:
+{
+  "spread": "compact",
+  "needs_split_stay": false,
+  "min_days": 3,
+  "ideal_days": 4
+}
+
+CRITICAL INSTRUCTION: You MUST output ONLY VALID JSON. Do not write Python scripts, pseudo-code, or explanations.
 """
