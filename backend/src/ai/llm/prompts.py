@@ -1,5 +1,69 @@
 
 # ==========================================
+# STAGE 0: PRE-FETCH INTELLIGENCE
+# ==========================================
+STAGE0_FETCH_PROFILE_PROMPT = """
+You are a travel destination analyzer. Given a destination name, determine what types of places are worth fetching from OpenStreetMap for travel itinerary planning.
+
+TASK:
+Analyze the destination and output a structured FetchProfile selecting ONLY from the valid OSM tag menu below.
+
+VALID OSM TAG MENU (you MUST pick only from these):
+
+ANCHOR tags (landmarks/attractions):
+  natural=beach, natural=peak, natural=cave_entrance, natural=water
+  waterway=waterfall
+  historic=fort, historic=castle, historic=monument, historic=ruins, historic=palace
+  tourism=attraction, tourism=museum, tourism=viewpoint, tourism=zoo, tourism=camp_site
+  amenity=place_of_worship
+  leisure=park, leisure=nature_reserve, leisure=garden
+  man_made=ghat
+
+LIFESTYLE tags (food/dining):
+  amenity=restaurant, amenity=cafe, amenity=fast_food, amenity=ice_cream
+
+EXTRAS tags (nightlife/wellness/other):
+  amenity=bar, amenity=nightclub, amenity=pub
+  leisure=spa
+  shop=bakery
+
+RULES:
+1. Pick 3-8 anchor tags most relevant to the destination. Prioritize what the place is FAMOUS for.
+2. Always include amenity=restaurant and amenity=cafe in lifestyle.
+3. Set priority "high" for the destination's signature attraction types.
+4. Set limits based on destination spread:
+   - Compact cities (Varanasi, Jaipur, Udaipur): anchor_limit=300, lifestyle_limit=200, extras_limit=100
+   - Wide/state-level areas (Goa, Kerala, Rajasthan): anchor_limit=400, lifestyle_limit=300, extras_limit=200
+5. destination_type should be a short snake_case label (e.g. "beach_heritage", "spiritual_cultural", "adventure_nature").
+
+OUTPUT FORMAT (JSON only, no explanations):
+{
+  "destination_type": "<type>",
+  "anchor_tags": [
+    {"key": "<osm_key>", "value": "<osm_value>", "priority": "high|medium|low"},
+    ...
+  ],
+  "lifestyle_tags": [
+    {"key": "<osm_key>", "value": "<osm_value>", "priority": "medium"},
+    ...
+  ],
+  "extras_tags": [
+    {"key": "<osm_key>", "value": "<osm_value>", "priority": "low"},
+    ...
+  ],
+  "anchor_limit": 400,
+  "lifestyle_limit": 300,
+  "extras_limit": 200
+}
+
+EXAMPLES:
+- Goa → anchor: beach(high), fort(high), monument(medium), place_of_worship(medium), viewpoint(low)
+- Varanasi → anchor: place_of_worship(high), ghat(high), museum(medium), monument(medium)
+- Rishikesh → anchor: place_of_worship(high), peak(high), waterfall(medium), viewpoint(medium)
+- Jaipur → anchor: fort(high), palace(high), museum(high), monument(medium), place_of_worship(medium), garden(low)
+"""
+
+# ==========================================
 # STAGE 1: GEOGRAPHIC STRUCTURING (Deterministic)
 # ==========================================
 STAGE1_STRUCTURER_PROMPT = """
@@ -26,9 +90,11 @@ STRICT RULES:
    * Never exceed 6 regions.
    * Never return only 1 region unless destination is extremely compact.
 
-4. Anchor requirement:
+4. Anchor requirement & Quality Limits:
    * Every region must contain at least 1 major non-food landmark (beach, fort, temple, major nature, etc.).
    * If a region has only food/nightlife, merge it with nearest valid region.
+   * ⚠️ CRITICAL: **You must prioritize keeping places with the highest `score`. Do NOT drop famous, high-scoring landmarks.**
+   * ⚠️ CRITICAL: **Output at least 20-30 places per region** (if available in input) to give downstream curators enough options. Do not aggressively prune the list.
 
 5. Distinct beaches must remain separate entries (Calangute ≠ Baga ≠ Candolim).
 
@@ -59,7 +125,7 @@ You are a travel curator operating inside pre-defined geographic regions.
 
 TASK:
 For each region:
-* Assign category, subcategory, specialty, best_time
+* Assign category, subcategory, highlights, best_time
 * Decide priority: main vs optional
 * Classify meal_type for food/nightlife
 
@@ -72,11 +138,16 @@ CURATION RULES:
 5. Every region MUST include 2-4 food/restaurant places from the metadata pool. Nature-heavy regions should still include nearby cafes or restaurants.
 6. best_time must reflect realistic visiting conditions.
 7. Limit "main" priority to 3-5 top landmarks per region. Remaining non-food should be "optional".
+8. ⚠️ CRITICAL: Use the EXACT place name from the input. Do NOT rename, reword, shorten, or embellish any place name. If the input says "Baga Beach", output must say "Baga Beach" — not "Baga Shoreline" or "Baga".
+9. ⚠️ CRITICAL: Only select places from the metadata pool. Never invent or add new places.
+10. ⚠️ CRITICAL: **Do NOT arbitrarily drop valid attractions.** You must return all valid places from the input region to ensure the scheduling algorithm has enough options.
 
-CATEGORIES allowed:
-nature, heritage, food, nightlife, relaxation, shopping, adventure, other
+CATEGORIES — use ONLY these exact strings:
+beach, fort, palace, temple, ghat, monument, ruins, cave, museum, viewpoint,
+peak, waterfall, island, lake, garden, zoo, nature, park, attraction,
+restaurant, cafe, nightlife, spa, camping, other
 
-meal_type required for food/nightlife, null otherwise.
+meal_type required for restaurant/cafe/nightlife, null otherwise.
 
 Return updated JSON with enriched fields.
 Structure must match input:
@@ -108,11 +179,7 @@ RULES:
 4. min_days should reflect realistic coverage without rushing.
 5. If needs_split_stay is true, spread MUST be "wide", not "compact".
 
-Return full JSON with travel_profile populated.
-Structure:
-{
-  "regions": [...],
-  "travel_profile": { ... }
-}
+Return the entire input JSON exactly as it was provided, but add a new "travel_profile" alongside "regions".
+⚠️ CRITICAL: Do NOT truncate arrays or use "[...]". You must output every single place perfectly intact.
 No explanations.
 """
