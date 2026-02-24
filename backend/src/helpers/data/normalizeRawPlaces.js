@@ -25,6 +25,8 @@ function getCategoryFromTags(tags) {
   if (tags.leisure === "park" || tags.leisure === "nature_reserve") return "park";
   if (tags.leisure === "garden") return "garden";
   if (tags.leisure === "spa") return "spa";
+  if (tags.leisure === "water_park") return "adventure";
+  if (tags.sport) return "adventure";
 
   // Fallback to generic tag keys
   return tags.tourism || tags.historic || tags.natural || tags.leisure || tags.amenity || "unknown";
@@ -65,6 +67,21 @@ function normalizeRawPlaces(rawPlaces) {
       "costa coffee", "chai point", "dunkin"
     ];
     return !blockedChains.some(chain => name.includes(chain));
+  });
+
+  // [FIX 3] Generic Name Filter — removes OSM noise like "Street food", "parking", single-word entries
+  const GENERIC_NAMES = new Set([
+    'street food', 'food court', 'tea stall', 'snack bar', 'food stall',
+    'meditation place', 'yoga center', 'prayer hall', 'rest area',
+    'parking', 'bus stop', 'taxi stand', 'atm', 'petrol pump',
+    'public toilet', 'drinking water', 'water tank', 'bus station',
+    'unnamed', 'unknown', 'no name'
+  ]);
+  places = places.filter(p => {
+    const name = p.name.toLowerCase().trim();
+    if (name.length < 3) return false;
+    if (GENERIC_NAMES.has(name)) return false;
+    return true;
   });
 
   // 2. Calculate Commercial Density (Hub Signal)
@@ -169,6 +186,7 @@ function normalizeRawPlaces(rawPlaces) {
     else if (category === 'garden') baseScore = 40;
     else if (category === 'zoo') baseScore = 40;
     else if (category === 'peak') baseScore = 35;
+    else if (category === 'adventure') baseScore = 65;
     else if (category === 'attraction') baseScore = 30;
     else if (category === 'camping') baseScore = 30;
     else if (category === 'spa') baseScore = 25;
@@ -176,12 +194,13 @@ function normalizeRawPlaces(rawPlaces) {
     // B. Hub Bonus (Popularity Proxy)
     // log(1) = 0, log(10) = 2.3, log(50) = 3.9, log(100) = 4.6
     // Multiplier 15 -> 100 neighbors adds ~70 points
-    const hubBonus = Math.log(p.hub_density + 1) * 15;
+    // [FIX 1] Cap hub density bonus at 25 to prevent dense commercial areas from outscoring famous landmarks
+    const hubBonus = Math.min(Math.log(p.hub_density + 1) * 10, 25);
 
     // C. Metadata Score (Quality)
     let metaScore = 0;
-    if (tags.wikipedia) metaScore += 30;
-    if (tags.wikidata) metaScore += 20;
+    if (tags.wikipedia) metaScore += 50;   // Wikipedia = verified famous landmark
+    if (tags.wikidata) metaScore += 30;    // Wikidata = verified entity
     if (tags.website || tags['contact:website']) metaScore += 10;
     if (tags.image) metaScore += 10;
     if (tags.description) metaScore += 10;

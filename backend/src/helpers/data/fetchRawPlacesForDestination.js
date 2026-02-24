@@ -128,7 +128,7 @@ async function fetchRawPlacesForDestination(destination) {
   const ANCHOR_CATEGORIES = new Set([
     'beach', 'fort', 'museum', 'viewpoint', 'waterfall', 'monument',
     'peak', 'island', 'temple', 'ghat', 'cave', 'garden', 'palace',
-    'ruins', 'attraction', 'zoo', 'park', 'nature_reserve',
+    'ruins', 'attraction', 'zoo', 'park', 'nature_reserve', 'adventure',
   ]);
 
   normalized.forEach(p => {

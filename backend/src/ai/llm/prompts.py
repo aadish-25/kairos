@@ -16,8 +16,9 @@ ANCHOR tags (landmarks/attractions):
   historic=fort, historic=castle, historic=monument, historic=ruins, historic=palace
   tourism=attraction, tourism=museum, tourism=viewpoint, tourism=zoo, tourism=camp_site
   amenity=place_of_worship
-  leisure=park, leisure=nature_reserve, leisure=garden
+  leisure=park, leisure=nature_reserve, leisure=garden, leisure=water_park
   man_made=ghat
+  sport=swimming, sport=surfing, sport=climbing
 
 LIFESTYLE tags (food/dining):
   amenity=restaurant, amenity=cafe, amenity=fast_food, amenity=ice_cream
@@ -59,7 +60,7 @@ OUTPUT FORMAT (JSON only, no explanations):
 EXAMPLES:
 - Goa → anchor: beach(high), fort(high), monument(medium), place_of_worship(medium), viewpoint(low)
 - Varanasi → anchor: place_of_worship(high), ghat(high), museum(medium), monument(medium)
-- Rishikesh → anchor: place_of_worship(high), peak(high), waterfall(medium), viewpoint(medium)
+- Rishikesh → anchor: place_of_worship(high), peak(high), waterfall(medium), viewpoint(medium), swimming(medium)
 - Jaipur → anchor: fort(high), palace(high), museum(high), monument(medium), place_of_worship(medium), garden(low)
 """
 
@@ -141,10 +142,11 @@ CURATION RULES:
 8. ⚠️ CRITICAL: Use the EXACT place name from the input. Do NOT rename, reword, shorten, or embellish any place name. If the input says "Baga Beach", output must say "Baga Beach" — not "Baga Shoreline" or "Baga".
 9. ⚠️ CRITICAL: Only select places from the metadata pool. Never invent or add new places.
 10. ⚠️ CRITICAL: **Do NOT arbitrarily drop valid attractions.** You must return all valid places from the input region to ensure the scheduling algorithm has enough options.
+11. ⚠️ CRITICAL: **Prefer places that have `wikipedia` or `wikidata` in their osm_keys array.** These are verified famous landmarks and MUST be prioritized as "main". Places without these signals should be deprioritized to "optional" unless they are clearly well-known.
 
 CATEGORIES — use ONLY these exact strings:
 beach, fort, palace, temple, ghat, monument, ruins, cave, museum, viewpoint,
-peak, waterfall, island, lake, garden, zoo, nature, park, attraction,
+peak, waterfall, island, lake, garden, zoo, nature, park, attraction, adventure,
 restaurant, cafe, nightlife, spa, camping, other
 
 meal_type required for restaurant/cafe/nightlife, null otherwise.
