@@ -8,7 +8,7 @@ const VALID_CATEGORIES = new Set([
     // Internal specific categories (primary)
     'beach', 'fort', 'palace', 'temple', 'ghat', 'monument', 'ruins', 'cave',
     'museum', 'viewpoint', 'peak', 'waterfall', 'island', 'lake', 'garden',
-    'zoo', 'nature', 'park', 'attraction',
+    'zoo', 'nature', 'park', 'attraction', 'bridge',
     'restaurant', 'cafe', 'nightlife', 'spa', 'camping',
     // Legacy broad categories (still accepted for backward compat)
     'heritage', 'food', 'relaxation', 'shopping', 'adventure', 'other'

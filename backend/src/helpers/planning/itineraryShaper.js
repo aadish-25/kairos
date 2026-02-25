@@ -14,6 +14,8 @@ function calculateRegionScores(regions) {
     return regions.map(region => {
         let mainCount = 0;
         const subcats = new Set();
+        let qualitySum = 0;
+        let bestAnchorScore = 0;
 
         // Only count genuine attractions (not food, not rescued from other regions)
         const validPlaces = (region.places || []).filter(p =>
@@ -23,9 +25,16 @@ function calculateRegionScores(regions) {
         validPlaces.forEach(p => {
             if (p.priority === 'main') mainCount++;
             if (p.subcategory) subcats.add(p.subcategory);
+            const qs = p.quality_score || 0;
+            qualitySum += qs;
+            if (qs > bestAnchorScore) bestAnchorScore = qs;
         });
 
-        const score = (mainCount * 2) + (validPlaces.length * 1) + (subcats.size * 1);
+        // Score formula: heavily weight quality to ensure famous landmarks drive region selection
+        // - bestAnchorScore: ensures a region with one 95-score Palace beats one with five 30-score parks
+        // - qualitySum / 10: rewards having multiple quality anchors
+        // - mainCount * 2 + subcats.size: preserves diversity signal
+        const score = (bestAnchorScore * 2) + (qualitySum / 10) + (mainCount * 2) + (subcats.size * 1);
         return { ...region, score };
     });
 }

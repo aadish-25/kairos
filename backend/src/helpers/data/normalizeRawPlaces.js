@@ -17,6 +17,7 @@ function getCategoryFromTags(tags) {
   if (tags.tourism === "camp_site") return "camping";
   if (tags.amenity === "place_of_worship") return "temple";
   if (tags.man_made === "ghat") return "ghat";
+  if (tags.man_made === "bridge") return "bridge";
   if (tags.amenity === "restaurant") return "restaurant";
   if (tags.amenity === "cafe") return "cafe";
   if (tags.amenity === "fast_food") return "restaurant";
@@ -176,6 +177,7 @@ function normalizeRawPlaces(rawPlaces) {
     else if (category === 'palace') baseScore = 75;
     else if (category === 'temple') baseScore = 70;
     else if (category === 'ghat') baseScore = 70;
+    else if (category === 'bridge') baseScore = 70;
     else if (category === 'monument') baseScore = 65;
     else if (category === 'island') baseScore = 60;
     else if (category === 'cave') baseScore = 60;
@@ -194,8 +196,9 @@ function normalizeRawPlaces(rawPlaces) {
     // B. Hub Bonus (Popularity Proxy)
     // log(1) = 0, log(10) = 2.3, log(50) = 3.9, log(100) = 4.6
     // Multiplier 15 -> 100 neighbors adds ~70 points
-    // [FIX 1] Cap hub density bonus at 25 to prevent dense commercial areas from outscoring famous landmarks
-    const hubBonus = Math.min(Math.log(p.hub_density + 1) * 10, 25);
+    // [FIX 1] Cap hub density bonus at 35 to prevent extreme commercial areas from outscoring landmarks
+    // while still rewarding popular tourist zones (heritage cities have dense markets near palaces)
+    const hubBonus = Math.min(Math.log(p.hub_density + 1) * 10, 35);
 
     // C. Metadata Score (Quality)
     let metaScore = 0;

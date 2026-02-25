@@ -17,7 +17,7 @@ ANCHOR tags (landmarks/attractions):
   tourism=attraction, tourism=museum, tourism=viewpoint, tourism=zoo, tourism=camp_site
   amenity=place_of_worship
   leisure=park, leisure=nature_reserve, leisure=garden, leisure=water_park
-  man_made=ghat
+  man_made=ghat, man_made=bridge
   sport=swimming, sport=surfing, sport=climbing
 
 LIFESTYLE tags (food/dining):
@@ -142,12 +142,13 @@ CURATION RULES:
 8. ⚠️ CRITICAL: Use the EXACT place name from the input. Do NOT rename, reword, shorten, or embellish any place name. If the input says "Baga Beach", output must say "Baga Beach" — not "Baga Shoreline" or "Baga".
 9. ⚠️ CRITICAL: Only select places from the metadata pool. Never invent or add new places.
 10. ⚠️ CRITICAL: **Do NOT arbitrarily drop valid attractions.** You must return all valid places from the input region to ensure the scheduling algorithm has enough options.
-11. ⚠️ CRITICAL: **Prefer places that have `wikipedia` or `wikidata` in their osm_keys array.** These are verified famous landmarks and MUST be prioritized as "main". Places without these signals should be deprioritized to "optional" unless they are clearly well-known.
+11. ⚠️ CRITICAL: **Use the `score` field to guide priority.** Places with score >= 70 are objectively important landmarks and MUST be "main". Places with `wikipedia` or `wikidata` in their osm_keys are verified famous landmarks — ALWAYS make them "main".
+12. ⚠️ CRITICAL: **Never drop a place that has `wikipedia` or `wikidata` in osm_keys.** These represent world-famous sites that tourists specifically travel to see.
 
 CATEGORIES — use ONLY these exact strings:
 beach, fort, palace, temple, ghat, monument, ruins, cave, museum, viewpoint,
 peak, waterfall, island, lake, garden, zoo, nature, park, attraction, adventure,
-restaurant, cafe, nightlife, spa, camping, other
+bridge, restaurant, cafe, nightlife, spa, camping, other
 
 meal_type required for restaurant/cafe/nightlife, null otherwise.
 
